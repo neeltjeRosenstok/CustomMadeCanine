@@ -11,8 +11,8 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.7.10-online-test";
-const SESSION_COOKIE = "cmc_session_online_test";
+const APP_VERSION = "21.7.11-online-test";
+const SESSION_COOKIE = "cmc_session_online_test_21711";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
 const PRIVATE_UPLOAD_DIR = path.join(DATA_DIR, "private-uploads");
@@ -316,6 +316,8 @@ try { db.exec("ALTER TABLE pets ADD COLUMN neutered_spayed INTEGER NOT NULL DEFA
 try { db.exec("ALTER TABLE pets ADD COLUMN behavior_notes TEXT"); } catch {}
 try { db.exec("ALTER TABLE pets ADD COLUMN medical_procedures TEXT"); } catch {}
 try { db.exec("ALTER TABLE pets ADD COLUMN trainer_notes TEXT"); } catch {}
+try { db.exec("ALTER TABLE pets ADD COLUMN create_token TEXT"); } catch {}
+try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_pets_user_create_token ON pets(user_id,create_token) WHERE create_token IS NOT NULL"); } catch {}
 try { db.exec("ALTER TABLE pets ADD COLUMN archived INTEGER NOT NULL DEFAULT 0"); } catch {}
 try { db.exec("ALTER TABLE pets ADD COLUMN archived_at TEXT"); } catch {}
 try { db.exec("ALTER TABLE classes ADD COLUMN min_age_months INTEGER"); } catch {}
@@ -949,11 +951,25 @@ app.post("/api/my/pets",requireAuth,imageUpload.fields([
   {name:"dogPhoto",maxCount:1},
   {name:"vaccinationPages",maxCount:6}
 ]),(req,res)=>{
-  const {name,species,breed,age,dateOfBirth,notes,gender,neuteredSpayed,behaviorNotes,medicalProcedures}=req.body;
+  const {name,species,breed,age,dateOfBirth,notes,gender,neuteredSpayed,behaviorNotes,medicalProcedures,createToken}=req.body;
   if(!name) return res.status(400).json({error:"Dog name required."});
+  const cleanToken=String(createToken||"").trim()||null;
+  if(cleanToken){
+    const existing=db.prepare("SELECT id FROM pets WHERE user_id=? AND create_token=?").get(req.user.id,cleanToken);
+    if(existing)return res.json(petDetailsForUser(req.user.id).find(p=>p.id===Number(existing.id)));
+  }
   const cleanGender=["male","female"].includes(String(gender||"").toLowerCase())?String(gender).toLowerCase():null;
-  const id=db.prepare("INSERT INTO pets(user_id,name,species,breed,age,date_of_birth,notes,gender,neutered_spayed,behavior_notes,medical_procedures) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-    .run(req.user.id,name,species||"Dog",breed||"",age||"",dateOfBirth||null,notes||"",cleanGender,neuteredSpayed?1:0,String(behaviorNotes||""),String(medicalProcedures||"")).lastInsertRowid;
+  let id;
+  try{
+    id=db.prepare("INSERT INTO pets(user_id,name,species,breed,age,date_of_birth,notes,gender,neutered_spayed,behavior_notes,medical_procedures,create_token) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
+      .run(req.user.id,name,species||"Dog",breed||"",age||"",dateOfBirth||null,notes||"",cleanGender,neuteredSpayed?1:0,String(behaviorNotes||""),String(medicalProcedures||""),cleanToken).lastInsertRowid;
+  }catch(err){
+    if(cleanToken&&String(err.message||"").includes("UNIQUE")){
+      const existing=db.prepare("SELECT id FROM pets WHERE user_id=? AND create_token=?").get(req.user.id,cleanToken);
+      if(existing)return res.json(petDetailsForUser(req.user.id).find(p=>p.id===Number(existing.id)));
+    }
+    throw err;
+  }
   const add=db.prepare("INSERT INTO pet_files(pet_id,kind,original_name,mime_type,file_path) VALUES(?,?,?,?,?)");
   const dogPhoto=req.files?.dogPhoto?.[0];
   if(dogPhoto) add.run(id,"photo",dogPhoto.originalname,dogPhoto.mimetype,dogPhoto.filename);
@@ -1500,6 +1516,63 @@ app.post("/api/trainer/class-enrolments/:id/refund",requireTrainer,(req,res)=>{
   logActivity({userId:e.user_id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"trainer",action:"class_refund_decision",details});
   res.json({ok:true});
 });
+app.put("/api/trainer/classes/:id",requireTrainer,(req,res)=>{
+  const current=db.prepare("SELECT * FROM classes WHERE id=?").get(req.params.id);
+  if(!current)return res.status(404).json({error:"Course not found."});
+  const {title,startDate,startTime,endTime,price,capacity,count,recurrence,customDates,locationType,locationName,minAgeMonths,maxAgeMonths}=req.body;
+  if(!title||!startTime||!endTime)return res.status(400).json({error:"Please complete the course details."});
+  const chosenLocation=locationType||"arena";
+  if(!["arena","alternate"].includes(chosenLocation))return res.status(400).json({error:"Choose the class location."});
+  if(chosenLocation==="alternate"&&!String(locationName||"").trim())return res.status(400).json({error:"Enter the alternate class location."});
+  const n=Math.max(1,Math.min(20,Number(count||5)));
+  if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime)||startTime>=endTime)return res.status(400).json({error:"Choose valid start and end times."});
+  let dates=[];
+  if(recurrence==="custom"){
+    dates=Array.isArray(customDates)?customDates.filter(Boolean).slice(0,n):[];
+    if(dates.length!==n)return res.status(400).json({error:`Please provide exactly ${n} class dates.`});
+  }else{
+    if(!startDate)return res.status(400).json({error:"Please choose a first date."});
+    const first=new Date(startDate+"T12:00:00");if(Number.isNaN(first.getTime()))return res.status(400).json({error:"Please choose a valid first date."});
+    const step=recurrence==="biweekly"?2:recurrence==="weekly"?1:null;if(!step)return res.status(400).json({error:"Please choose a recurrence pattern."});
+    for(let i=0;i<n;i++){const d=new Date(first);d.setDate(d.getDate()+i*7*step);dates.push(d.toISOString().slice(0,10));}
+  }
+  dates=[...new Set(dates)].sort();if(dates.length!==n)return res.status(400).json({error:"Class dates must be unique."});
+  const minAge=minAgeMonths===""||minAgeMonths==null?null:Number(minAgeMonths),maxAge=maxAgeMonths===""||maxAgeMonths==null?null:Number(maxAgeMonths);
+  if((minAge!=null&&!Number.isInteger(minAge))||(maxAge!=null&&!Number.isInteger(maxAge))||(minAge!=null&&minAge<0)||(maxAge!=null&&maxAge<0)|| (minAge!=null&&maxAge!=null&&minAge>maxAge))return res.status(400).json({error:"Please check the course age limits."});
+  const conflicts=[];
+  for(const date of dates){
+    const st=isoDateTime(date,startTime),en=isoDateTime(date,endTime);
+    const blocks=db.prepare("SELECT * FROM availability_blocks WHERE start_at < ? AND end_at > ?").all(en,st);
+    const bookings=db.prepare("SELECT b.booking_ref,b.start_at,b.end_at,u.name client FROM bookings b JOIN users u ON u.id=b.user_id WHERE b.status!='cancelled' AND b.payment_status IN ('paid','demo_paid','pending')").all().filter(b=>overlaps(st,en,b.start_at,b.buffer_end_at));
+    const classes=db.prepare("SELECT s.session_date,s.start_time,s.end_time,c.title FROM class_sessions s JOIN classes c ON c.id=s.class_id WHERE c.status='open' AND c.id!=?").all(current.id).filter(x=>overlaps(st,en,isoDateTime(x.session_date,x.start_time),isoDateTime(x.session_date,x.end_time)));
+    const arenaUnavailable=(chosenLocation==="arena"&&serviceUnavailable("arena",st,en))||scheduleBlockConflict(chosenLocation==="arena"?"arena":"alternate",st,en);
+    if(blocks.length||bookings.length||classes.length||arenaUnavailable)conflicts.push({date,blocks,bookings,classes,arenaUnavailable});
+  }
+  if(conflicts.length)return res.status(409).json({error:"One or more edited course dates conflict with blocked, booked, class, or arena-unavailable time.",conflicts});
+  const cap=Math.max(1,Number(capacity||12));
+  const activeCount=db.prepare("SELECT COUNT(*) n FROM class_enrolments WHERE class_id=? AND enrolment_status='active'").get(current.id).n;
+  if(cap<activeCount)return res.status(400).json({error:`Capacity cannot be lower than the ${activeCount} active enrolment(s).`});
+  db.transaction(()=>{
+    db.prepare("UPDATE classes SET title=?,start_date=?,end_date=?,weekday=?,start_time=?,end_time=?,capacity=?,price=?,location_type=?,location_name=?,min_age_months=?,max_age_months=? WHERE id=?")
+      .run(String(title).trim(),dates[0],dates[dates.length-1],weekdayName(dates[0]),startTime,endTime,cap,Number(price||0),chosenLocation,chosenLocation==="alternate"?String(locationName).trim():null,minAge,maxAge,current.id);
+    db.prepare("DELETE FROM class_sessions WHERE class_id=?").run(current.id);
+    const add=db.prepare("INSERT INTO class_sessions(class_id,session_date,start_time,end_time) VALUES(?,?,?,?)");
+    for(const d of dates)add.run(current.id,d,startTime,endTime);
+  })();
+  logActivity({classId:Number(current.id),actorUserId:req.user.id,actorRole:"trainer",action:"class_edited",details:`Course updated: ${title}; ${dates.length} session(s).`});
+  res.json({ok:true,id:Number(current.id),dates});
+});
+
+app.delete("/api/trainer/classes/:id",requireTrainer,(req,res)=>{
+  const course=db.prepare("SELECT * FROM classes WHERE id=?").get(req.params.id);
+  if(!course)return res.status(404).json({error:"Course not found."});
+  const enrolments=db.prepare("SELECT COUNT(*) n FROM class_enrolments WHERE class_id=?").get(course.id).n;
+  if(enrolments)return res.status(409).json({error:"This course has enrolment history and cannot be deleted. Cancel or handle the enrolments instead."});
+  db.prepare("DELETE FROM classes WHERE id=?").run(course.id);
+  logActivity({classId:Number(course.id),actorUserId:req.user.id,actorRole:"trainer",action:"class_deleted",details:`Course deleted: ${course.title}.`});
+  res.json({ok:true});
+});
+
 app.post("/api/trainer/classes",requireTrainer,(req,res)=>{
   const {title,description,startDate,startTime,endTime,price,capacity,count,recurrence,customDates,locationType,locationName,minAgeMonths,maxAgeMonths}=req.body;
   if(!title||!startDate||!startTime||!endTime)return res.status(400).json({error:"Please complete the course details."});

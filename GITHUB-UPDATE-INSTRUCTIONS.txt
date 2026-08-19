@@ -1,0 +1,13 @@
+GitHub update from v21.7.10 online test to v21.7.11
+
+Replace these files in the repository:
+1. server.js (repository root)
+2. package.json (repository root)
+3. VERSION.txt (repository root)
+4. public/app.js
+5. public/styles.css
+6. public/index.html
+
+Do NOT move app.js/styles.css/index.html to the repository root. They belong inside public/.
+
+Once these files are committed, Render should redeploy automatically. The persistent /var/data database is kept; the wrongly dated course can then be opened under Amy > Classes and edited or deleted.
