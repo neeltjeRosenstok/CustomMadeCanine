@@ -1,0 +1,10 @@
+The Custom Made Canine v21.7.10 ONLINE TEST
+
+Deployment adaptations:
+- Render Blueprint included.
+- Persistent DATA_DIR support.
+- Render-compatible 0.0.0.0 / PORT binding.
+- Secure production cookies behind proxy.
+- Demo M-Pesa forced by ONLINE_TEST.
+- Test/privacy banner.
+- Local database/uploads removed from deployment package.

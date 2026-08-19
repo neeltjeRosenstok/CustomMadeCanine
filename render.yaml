@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: the-custom-made-canine-test
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ONLINE_TEST
+        value: "true"
+      - key: DATA_DIR
+        value: /var/data
+      - key: SEED_DEMO_CLIENT
+        value: "false"
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+    disk:
+      name: canine-test-data
+      mountPath: /var/data
+      sizeGB: 1

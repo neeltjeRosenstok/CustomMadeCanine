@@ -1,0 +1,15 @@
+LOCAL TRIAL TEST ACCOUNT
+
+Trainer:
+  Email: amy@example.com
+  Password: change-me
+
+Client:
+  Email: david@example.com
+  Password: David123!
+
+The David account is trial-only seed data and is created automatically when
+NODE_ENV is not production. Change/remove it before any real deployment.
+
+The application uses a versioned session cookie in v21.4 so sessions from
+older builds cannot be interpreted against a new database.
