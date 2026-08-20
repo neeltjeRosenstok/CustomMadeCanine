@@ -1,6 +1,6 @@
 {
   "name": "custom-made-canine",
-  "version": "21.8.0-online-test",
+  "version": "21.8.2-online-test",
   "private": true,
   "description": "Lightweight booking and client portal for Custom Made Canine.",
   "main": "server.js",

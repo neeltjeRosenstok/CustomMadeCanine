@@ -1,3 +1,8 @@
-The Custom Made Canine v21.8.0 ONLINE TEST
+The Custom Made Canine v21.8.2 ONLINE TEST
 
-Major workflow update: booking summaries and terms, Ridgeways wording, silent lunch blocks, client reschedule requests, 24-hour holds, trainer-created private packages, pending-payment recovery, manual M-Pesa fallback, vaccination guidance, newsletter/contact/billing fields, automatic client status, improved activity notifications, and Reports.
+Pending-payment recovery hotfix:
+- Older unpaid bookings created before the 24-hour hold system are normalized automatically.
+- A legacy unpaid booking whose appointment time has already passed becomes Expired and releases the slot.
+- A still-future legacy unpaid booking becomes Awaiting payment with a 24-hour hold measured from its original creation time.
+- Pending bookings can no longer become a dead end in the Client Portal because of an older status value.
+- Resume payment accepts legacy pending records after normalization.

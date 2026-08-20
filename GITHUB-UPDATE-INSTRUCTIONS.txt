@@ -1,13 +1,18 @@
-GitHub update from v21.7.10 online test to v21.7.11
+The Custom Made Canine v21.8.2 pending-payment hotfix
 
-Replace these files in the repository:
+Replace these files in GitHub:
 1. server.js (repository root)
 2. package.json (repository root)
 3. VERSION.txt (repository root)
 4. public/app.js
-5. public/styles.css
-6. public/index.html
+5. public/index.html
 
-Do NOT move app.js/styles.css/index.html to the repository root. They belong inside public/.
+No database reset is required. Existing Render /var/data is preserved.
 
-Once these files are committed, Render should redeploy automatically. The persistent /var/data database is kept; the wrongly dated course can then be opened under Amy > Classes and edited or deleted.
+After Render redeploys, the log should show:
+The Custom Made Canine v21.8.2-online-test listening on port 10000
+
+Then hard refresh (Ctrl+F5), sign into the client portal and open Bookings.
+
+For the old Jasiri booking on 20 August at 08:00:
+because that appointment time has already passed, it should now display as Expired rather than remaining stuck at Pending, and the portal should offer Book again.
