@@ -1,6 +1,3 @@
-The Custom Made Canine v21.7.11 ONLINE TEST
+The Custom Made Canine v21.8.0 ONLINE TEST
 
-- Trainer can edit an existing course, including individual session dates, times, price, capacity, age limits and location.
-- Trainer can delete a course only while it has no enrolment history.
-- Course edits run the same booking/block/class conflict checks and exclude the course's own old sessions.
-- Add Dog now guards against double submission in the browser and uses a server-side idempotency token to prevent duplicate dog creation from the same save request.
+Major workflow update: booking summaries and terms, Ridgeways wording, silent lunch blocks, client reschedule requests, 24-hour holds, trainer-created private packages, pending-payment recovery, manual M-Pesa fallback, vaccination guidance, newsletter/contact/billing fields, automatic client status, improved activity notifications, and Reports.
