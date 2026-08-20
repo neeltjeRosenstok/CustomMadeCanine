@@ -606,5 +606,24 @@ b,strong{font-weight:500}
 .terms-check,.newsletter-optin{display:block;margin-top:12px;line-height:1.45}.terms-check input,.newsletter-optin input{width:auto;margin-right:8px}.inline-policy{display:inline;padding:0;text-decoration:underline}.policy-modal{max-width:720px}.policy-copy p{line-height:1.6}
 .vaccination-explanation{padding:12px;border-radius:12px;background:rgba(37,33,94,.06);margin:10px 0}.vaccination-explanation p{margin:.35rem 0}.vaccination-reminder{margin-top:14px}.manual-payment-box{margin-top:18px;padding:16px;border-top:1px solid rgba(37,33,94,.18)}.mpesa-title{font-size:42px!important}
 .package-booking-modal{max-width:780px}.reports-screen{max-width:none}.report-controls{margin-bottom:16px}.report-paper{background:white;color:#161616;padding:24px;border-radius:12px}.report-heading{display:flex;gap:16px;align-items:center;border-bottom:2px solid #ddd;padding-bottom:12px;margin-bottom:16px}.report-heading img{width:58px;height:58px;object-fit:contain}.report-table-wrap{overflow:auto}.report-table{width:100%;border-collapse:collapse;font-size:13px}.report-table th,.report-table td{border:1px solid #ddd;padding:7px;text-align:left;vertical-align:top}.report-table th{font-weight:650}.account-panel hr{border:0;border-top:1px solid rgba(37,33,94,.18);margin:22px 0}
-@media print{body{background:#fff}.topbar,.menu,.back-dashboard,.report-controls,.online-test-banner,.admin-head{display:none!important}.app-shell main,.screen,.reports-screen{padding:0!important;margin:0!important}.report-paper{box-shadow:none!important;border:0!important;padding:0!important}.report-table{font-size:10pt}.report-table th,.report-table td{break-inside:avoid}}
+@page{size:A4 portrait;margin:10mm}
+@media print{
+ html,body{width:auto!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important}
+ body *{visibility:hidden!important}
+ .report-paper,.report-paper *{visibility:visible!important}
+ .report-paper{position:absolute!important;left:0!important;top:0!important;width:100%!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow:visible!important;box-sizing:border-box!important}
+ .report-heading{margin:0 0 5mm!important;padding:0 0 3mm!important;break-after:avoid-page!important}
+ .report-heading img{width:13mm!important;height:13mm!important}
+ .report-heading h2,.report-heading h3,.report-heading p{margin:.8mm 0!important}
+ .report-table-wrap{overflow:visible!important;width:100%!important}
+ .report-table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;font-size:8pt!important;line-height:1.15!important}
+ .report-table th,.report-table td{padding:1.3mm 1mm!important;vertical-align:top!important;overflow-wrap:anywhere!important;break-inside:avoid!important}
+ .report-table thead{display:table-header-group!important}
+ .report-table tr{break-inside:avoid!important}
+ .topbar,.menu,.back-dashboard,.report-controls,.online-test-banner,.admin-head{display:none!important}
+ .app-shell,.app-shell main,.screen,.reports-screen{height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important}
+}
 @media(max-width:700px){.report-paper{padding:12px}.report-table{font-size:11px}.package-booking-modal{width:96vw}}
+
+/* v21.8.3 reports */
+.report-table td,.report-table th{overflow-wrap:anywhere}.report-paper{max-width:210mm;margin-left:auto;margin-right:auto}
