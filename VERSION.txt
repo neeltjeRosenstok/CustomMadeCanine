@@ -1,9 +1,10 @@
-The Custom Made Canine v21.8.3 ONLINE TEST
+The Custom Made Canine v21.8.4 ONLINE TEST
 
-Reports + A4 portrait hotfix:
-- Payments report fixed: package rows now use PACKAGE-<id> because booking_packages has no package_ref field.
-- Daily Sheet Notes column removed.
-- Printed reports are constrained to A4 portrait.
-- Print mode isolates the report sheet from the application shell to prevent an unnecessary blank/second page.
-- Report tables use compact, report-specific columns and friendlier labels.
-- CSV export still contains the full raw report data.
+Display/layout update:
+- Report dates display as DD-MM-YYYY.
+- Report date/time fields display as DD-MM-YYYY HH:MM.
+- Report date ranges use DD-MM-YYYY.
+- Dashboard month title is larger.
+- Current clients use the full width of the Clients page.
+- Dormant clients are shown below Current clients.
+- Archived clients remain on their separate archived-clients page.

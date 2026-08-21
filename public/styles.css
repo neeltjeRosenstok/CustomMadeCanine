@@ -627,3 +627,24 @@ b,strong{font-weight:500}
 
 /* v21.8.3 reports */
 .report-table td,.report-table th{overflow-wrap:anywhere}.report-paper{max-width:210mm;margin-left:auto;margin-right:auto}
+
+/* v21.8.4 report dates, dashboard title, client layout */
+.trainer-month-title,
+.month-title,
+.calendar-month-title,
+.trainer-calendar-title,
+.month-nav h2,
+.calendar-nav h2{
+  font-size:clamp(22px,2.2vw,30px)!important;
+  line-height:1.15!important;
+  font-weight:650!important;
+}
+.client-groups-stacked{
+  display:block!important;
+  grid-template-columns:none!important;
+}
+.client-groups-stacked .client-group-wide{
+  width:100%!important;
+  max-width:none!important;
+  margin-bottom:28px!important;
+}
