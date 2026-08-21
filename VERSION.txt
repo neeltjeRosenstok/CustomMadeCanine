@@ -1,15 +1,9 @@
-The Custom Made Canine v21.9.1 ONLINE TEST
+The Custom Made Canine v21.9.2 ONLINE TEST
 
-Cautious phase 1 rebuild from stable v21.8.4:
-- Meet Amy title changed to “Set your dog up for life!”
-- Exact supplied Amy biography inserted without wording changes.
-- Supplied Amy & Ollie photo added.
-- Meet Amy action buttons centered.
-- Amy dashboard simplified to six agreed primary buttons.
-- Reports linked from Activity History.
-- Pending Reviews linked from Needs Attention.
-- New Course linked from Scheduling.
-- Reports page explanatory subtitle removed.
-- Report date inputs constrained to their fields.
-- Report dates use “21 Aug 2026” and date/times use “21 Aug 2026, 10:30”.
-No booking, payment, package, refund, reschedule, media-processing, or calendar-availability logic was changed in this phase.
+Small Phase 1 corrective update:
+- Fixed the incorrect reviewsAdminView() reference; trainer admin now calls the existing reviewAdminView().
+- Needs Attention shows “No pending reviews” as a disabled button when there are none.
+- Book for client now uses a dedicated client picker. Selecting a client goes directly to the booking/package modal without opening the private client-detail sheet first.
+- Normal Clients remains unchanged and still opens the full client record.
+
+No payment, class, package-payment, refund, reschedule, calendar or media-storage logic changed.

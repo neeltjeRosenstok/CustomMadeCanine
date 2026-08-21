@@ -1,24 +1,16 @@
-The Custom Made Canine v21.9.1 — cautious phase 1
+v21.9.2 small corrective update
 
 Replace in GitHub:
-1. server.js
-2. package.json
-3. VERSION.txt
-4. public/app.js
-5. public/styles.css
-6. public/index.html
-7. public/amy-ollie.jpg
+- server.js
+- package.json
+- VERSION.txt
+- public/app.js
+- public/index.html
 
-No database reset is required.
+No database reset.
 
-After Render redeploys, look for:
-The Custom Made Canine v21.9.1-online-test listening on port 10000
-
-Then Ctrl+F5 and test ONLY:
-- Home page opens normally
-- Meet Amy text/photo and centered buttons
-- Amy dashboard six buttons
-- Needs Attention → Pending reviews
-- Scheduling → New course
-- Activity History → Reports
-- Reports date controls and date formatting
+After Render redeploys, Ctrl+F5 and test:
+1. Needs Attention with no reviews → “No pending reviews” is disabled.
+2. Vaccination → Review record opens without a reviewsAdminView error.
+3. Dashboard → Book for client → select client → booking screen opens directly, with no client-detail sheet shown first.
+4. Dashboard → Clients → select client → full client detail still opens normally.
