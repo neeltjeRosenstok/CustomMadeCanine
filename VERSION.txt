@@ -1,12 +1,9 @@
-The Custom Made Canine v21.9.3 ONLINE TEST
+The Custom Made Canine v21.9.4 ONLINE TEST
 
-Focused corrections from v21.9.2:
-- Book for Client date field uses a full-width native date control.
-- Available times load automatically after date selection; redundant “Check available times” button removed.
-- Returning to Dashboard clears the temporary selected client/booking state.
-- Successful provisional booking/package returns to a clean Dashboard instead of leaving the client record open.
-- Amy's private dog note is read-only after saving; button says “Save note”; “Edit note” explicitly reopens editing.
-- Dashboard calendar removes “Month overview” and “Click a date to open the day schedule”.
-- Month title is slightly larger.
-- Saturday/Sunday are visually marked as weekend columns without changing the normal date-box availability background.
-No payment/refund/class-payment/media-storage logic changed.
+Very small date-picker correction:
+- Book for Client date field is now picker-only on desktop.
+- Keyboard typing/pasting into that native date field is blocked.
+- Clicking the date field opens the browser calendar picker.
+- Selecting a date still loads available times automatically.
+
+No booking, payment, package, notes, calendar, report, refund or media logic changed.

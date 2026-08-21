@@ -1,19 +1,15 @@
-v21.9.3 focused correction
+v21.9.4 tiny date-picker hotfix
 
 Replace in GitHub:
 - server.js
 - package.json
 - VERSION.txt
 - public/app.js
-- public/styles.css
 - public/index.html
 
 No database reset.
 
 After Render redeploys, Ctrl+F5 and test:
-1. Book for client → choose client → date picker.
-2. Select a date: times should appear automatically, with no Check available times button.
-3. Back to Dashboard: no client record should remain open.
-4. Create a provisional booking/package: success should return to a clean Dashboard.
-5. Clients → client → dog note: Edit note → Save note → field becomes read-only.
-6. Dashboard calendar: only month title above calendar; month title slightly larger; Sat/Sun visually distinguished without disabling/shading the actual date availability.
+Book for client → select client → click First date.
+The calendar picker should open; keyboard typing into DD/MM/YYYY should no longer be possible.
+Selecting a date should still load times automatically and allow the provisional booking/package flow.
