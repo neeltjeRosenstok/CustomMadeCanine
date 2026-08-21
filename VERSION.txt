@@ -1,10 +1,1 @@
-The Custom Made Canine v21.8.4 ONLINE TEST
-
-Display/layout update:
-- Report dates display as DD-MM-YYYY.
-- Report date/time fields display as DD-MM-YYYY HH:MM.
-- Report date ranges use DD-MM-YYYY.
-- Dashboard month title is larger.
-- Current clients use the full width of the Clients page.
-- Dormant clients are shown below Current clients.
-- Archived clients remain on their separate archived-clients page.
+The Custom Made Canine v21.9.0 ONLINE TEST
