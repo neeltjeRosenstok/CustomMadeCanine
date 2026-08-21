@@ -1,10 +1,15 @@
-The Custom Made Canine v21.8.4 ONLINE TEST
+The Custom Made Canine v21.9.1 ONLINE TEST
 
-Display/layout update:
-- Report dates display as DD-MM-YYYY.
-- Report date/time fields display as DD-MM-YYYY HH:MM.
-- Report date ranges use DD-MM-YYYY.
-- Dashboard month title is larger.
-- Current clients use the full width of the Clients page.
-- Dormant clients are shown below Current clients.
-- Archived clients remain on their separate archived-clients page.
+Cautious phase 1 rebuild from stable v21.8.4:
+- Meet Amy title changed to “Set your dog up for life!”
+- Exact supplied Amy biography inserted without wording changes.
+- Supplied Amy & Ollie photo added.
+- Meet Amy action buttons centered.
+- Amy dashboard simplified to six agreed primary buttons.
+- Reports linked from Activity History.
+- Pending Reviews linked from Needs Attention.
+- New Course linked from Scheduling.
+- Reports page explanatory subtitle removed.
+- Report date inputs constrained to their fields.
+- Report dates use “21 Aug 2026” and date/times use “21 Aug 2026, 10:30”.
+No booking, payment, package, refund, reschedule, media-processing, or calendar-availability logic was changed in this phase.

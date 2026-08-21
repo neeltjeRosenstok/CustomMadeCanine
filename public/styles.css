@@ -648,3 +648,29 @@ b,strong{font-weight:500}
   max-width:none!important;
   margin-bottom:28px!important;
 }
+
+/* v21.9.1 phase 1 */
+.amy-photo-real{width:min(760px,100%);margin:18px auto 24px}
+.amy-photo-real img{display:block;width:100%;max-height:560px;object-fit:cover;border-radius:20px}
+.amy-bio{max-width:820px;margin:0 auto}
+.amy-bio p{line-height:1.65;margin:0 0 16px}
+.meet-amy-actions{justify-content:center!important}
+
+.dashboard-six{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.dashboard-six .task-book{background:#dff2e4!important}
+.dashboard-six .task-resources{background:#e2ecfb!important}
+.dashboard-six .task-attention{background:#f8e0ea!important}
+.dashboard-six .task-hours{background:#faead7!important}
+.dashboard-six .task-clients{background:#fff3c9!important}
+.dashboard-six .task-history{background:#fff!important}
+@media(max-width:760px){.dashboard-six{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:460px){.dashboard-six{grid-template-columns:1fr!important}}
+
+.report-controls .form-grid{
+  grid-template-columns:minmax(220px,1fr) minmax(180px,220px) minmax(180px,220px)!important;
+  align-items:end!important
+}
+.report-controls input[type="date"],.report-controls select{
+  width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important
+}
+@media(max-width:760px){.report-controls .form-grid{grid-template-columns:1fr!important}}
