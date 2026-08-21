@@ -1,0 +1,21 @@
+Emergency rollback to v21.8.4
+
+The v21.9.0 frontend package was malformed and can produce a blank cream page.
+
+Replace these GitHub files with the files in this ZIP:
+1. server.js
+2. package.json
+3. VERSION.txt
+4. public/app.js
+5. public/styles.css
+6. public/index.html
+
+This does NOT reset or delete the Render /var/data database.
+
+After GitHub commits the files, Render should redeploy automatically.
+Look for:
+The Custom Made Canine v21.8.4-online-test listening on port 10000
+
+Then hard refresh the site with Ctrl+F5.
+
+Do not upload or replace the /var/data database.
