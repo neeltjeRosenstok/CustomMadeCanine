@@ -674,3 +674,61 @@ b,strong{font-weight:500}
   width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important
 }
 @media(max-width:760px){.report-controls .form-grid{grid-template-columns:1fr!important}}
+
+
+/* v21.9.3 focused trainer-flow and calendar corrections */
+.trainer-booking-date-row{
+  display:block;
+  width:100%;
+  margin:10px 0;
+}
+.trainer-booking-date-row label{
+  display:block;
+  width:100%;
+}
+.native-date-wrap{
+  display:block;
+  width:100%;
+  min-width:0;
+  margin-top:6px;
+  box-sizing:border-box;
+}
+.trainer-booking-date-input{
+  display:block;
+  width:100%!important;
+  min-width:240px!important;
+  max-width:100%!important;
+  box-sizing:border-box!important;
+}
+.client-record-modal textarea[readonly]{
+  background:rgba(255,255,255,.58);
+  cursor:default;
+}
+
+/* Month title only: slightly larger, clear and uncluttered. */
+.dashboard-month .month-calendar>.calendar-head>span{
+  font-size:clamp(24px,2.5vw,32px)!important;
+  line-height:1.15!important;
+  color:var(--navy)!important;
+  font-weight:500!important;
+}
+
+/* Weekend is a positional guide, not an availability state.
+   Headings/gutters are shaded; date buttons stay their normal background. */
+.month-weekdays .weekend-heading{
+  background:rgba(37,33,94,.07);
+  border-radius:6px;
+  padding:4px 0;
+  color:var(--navy)!important;
+}
+.month-grid .month-empty.weekend-column{
+  background:rgba(37,33,94,.055);
+  border-radius:8px;
+}
+.month-grid .month-day.weekend-column{
+  box-shadow:0 0 0 4px rgba(37,33,94,.045);
+  background:var(--white);
+}
+@media(max-width:520px){
+  .trainer-booking-date-input{min-width:0!important}
+}

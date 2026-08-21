@@ -1,9 +1,12 @@
-The Custom Made Canine v21.9.2 ONLINE TEST
+The Custom Made Canine v21.9.3 ONLINE TEST
 
-Small Phase 1 corrective update:
-- Fixed the incorrect reviewsAdminView() reference; trainer admin now calls the existing reviewAdminView().
-- Needs Attention shows “No pending reviews” as a disabled button when there are none.
-- Book for client now uses a dedicated client picker. Selecting a client goes directly to the booking/package modal without opening the private client-detail sheet first.
-- Normal Clients remains unchanged and still opens the full client record.
-
-No payment, class, package-payment, refund, reschedule, calendar or media-storage logic changed.
+Focused corrections from v21.9.2:
+- Book for Client date field uses a full-width native date control.
+- Available times load automatically after date selection; redundant “Check available times” button removed.
+- Returning to Dashboard clears the temporary selected client/booking state.
+- Successful provisional booking/package returns to a clean Dashboard instead of leaving the client record open.
+- Amy's private dog note is read-only after saving; button says “Save note”; “Edit note” explicitly reopens editing.
+- Dashboard calendar removes “Month overview” and “Click a date to open the day schedule”.
+- Month title is slightly larger.
+- Saturday/Sunday are visually marked as weekend columns without changing the normal date-box availability background.
+No payment/refund/class-payment/media-storage logic changed.
