@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.4-online-test";
+const APP_VERSION = "21.9.5-online-test";
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -1324,7 +1324,7 @@ app.get("/api/trainer/summary",requireTrainer,(req,res)=>{
     classes:db.prepare("SELECT c.*,(SELECT COUNT(*) FROM class_enrolments e WHERE e.class_id=c.id AND e.enrolment_status='active' AND e.payment_status IN ('pending','paid','demo_paid')) enrolled FROM classes c ORDER BY c.start_date DESC").all(),
     pendingReviews:db.prepare("SELECT r.*,u.name FROM reviews r JOIN users u ON u.id=r.user_id WHERE r.status='pending' ORDER BY r.created_at DESC").all(),
     vaccinationAttention:db.prepare(`SELECT p.id pet_id,p.name pet_name,p.breed,p.vaccination_status,p.vaccination_verified_at,u.id user_id,u.name client_name,(SELECT COUNT(*) FROM pet_files f WHERE f.pet_id=p.id AND f.kind='vaccination') vaccination_count FROM pets p JOIN users u ON u.id=p.user_id WHERE COALESCE(p.archived,0)=0 AND p.vaccination_status IN ('pending','rejected','not_provided') ORDER BY p.name`).all(),
-    cancellationAttention:db.prepare(`SELECT b.id,b.booking_ref,b.start_at,b.service,b.location_type,b.payment_status,b.price,b.refund_amount,b.refund_confirmation_code,u.name client_name,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE b.status='cancelled' AND b.payment_status='refund_pending' ORDER BY b.start_at DESC`).all(),
+    cancellationAttention:db.prepare(`SELECT b.id,b.user_id,b.pet_id,b.booking_ref,b.start_at,b.end_at,b.service,b.location_type,b.address,b.payment_status,b.status,b.price,b.refund_amount,b.refund_confirmation_code,u.name client_name,u.email client_email,COALESCE(u.whatsapp_phone,u.phone) client_phone,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE b.payment_status='refund_pending' ORDER BY b.start_at DESC`).all(),
     classRefundAttention:db.prepare(`SELECT e.id,e.class_id,e.booking_ref,e.payment_status,c.title,c.price,u.name client_name,p.name pet_name FROM class_enrolments e JOIN classes c ON c.id=e.class_id JOIN users u ON u.id=e.user_id LEFT JOIN pets p ON p.id=e.pet_id WHERE e.enrolment_status IN ('rejected','cancelled_by_client') AND e.payment_status='refund_pending' ORDER BY e.rejected_at DESC`).all(),
     rescheduleAttention:db.prepare(`SELECT rr.*,b.booking_ref,b.service,b.location_type,u.name client_name,p.name pet_name FROM reschedule_requests rr JOIN bookings b ON b.id=rr.booking_id JOIN users u ON u.id=rr.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE rr.status='pending' AND datetime(rr.hold_expires_at)>datetime('now') ORDER BY rr.created_at`).all(),
     manualPaymentAttention:db.prepare(`SELECT b.id,b.booking_ref,COALESCE(NULLIF(b.price,0),bp.package_price,0) price,b.manual_payment_code,b.manual_payment_amount,u.name client_name,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id LEFT JOIN booking_packages bp ON bp.id=b.package_id WHERE b.manual_payment_status='submitted' ORDER BY b.created_at`).all(),
@@ -1775,9 +1775,14 @@ app.post("/api/my/bookings/:id/accept-provisional",requireAuth,async(req,res)=>{
   try{const mpesa=await initiateMpesa(req.user.mpesa_phone||req.user.phone,amount,reference);if(pkg){db.prepare("UPDATE booking_packages SET mpesa_request_id=? WHERE id=?").run(mpesa.checkoutRequestId,pkg.id)}else db.prepare("UPDATE bookings SET mpesa_request_id=? WHERE id=?").run(mpesa.checkoutRequestId,b.id);res.json({bookingRef:reference,id:b.id,packageId:pkg?.id||null,amount,holdExpiresAt:b.hold_expires_at,firstAppointment:isFirstAppointmentForDog(b.pet_id),mpesaDemo:mpesa.demo,mpesaMessage:mpesa.demo?"Demo payment mode: press Confirm payment in the trial.":"Check your M-Pesa phone for the prompt.",type:pkg?'package':'private'});}catch(e){res.status(502).json({error:(e.message||'Could not start M-Pesa payment.')+' The hold remains active; you can retry or use Send Money.',bookingRef:reference,id:b.id,packageId:pkg?.id||null,amount,paymentPending:true});}
 });
 app.post("/api/my/bookings/:id/decline-provisional",requireAuth,(req,res)=>{
-  const r=db.prepare("UPDATE bookings SET status='cancelled',payment_status='cancelled' WHERE id=? AND user_id=? AND status='provisional'").run(req.params.id,req.user.id);
-  if(!r.changes) return res.status(404).json({error:"Provisional booking not found."});
-  res.json({ok:true});
+ const b=db.prepare("SELECT * FROM bookings WHERE id=? AND user_id=? AND status='provisional'").get(req.params.id,req.user.id);
+ if(!b)return res.status(404).json({error:"Provisional booking not found."});
+ if(b.package_id){
+   db.prepare("UPDATE booking_packages SET status='cancelled',payment_status='cancelled' WHERE id=? AND user_id=?").run(b.package_id,req.user.id);
+   db.prepare("UPDATE bookings SET status='cancelled',payment_status='cancelled' WHERE package_id=? AND user_id=? AND status='provisional'").run(b.package_id,req.user.id);
+ }else db.prepare("UPDATE bookings SET status='cancelled',payment_status='cancelled' WHERE id=?").run(b.id);
+ logActivity({userId:req.user.id,petId:b.pet_id,actorUserId:req.user.id,actorRole:'client',action:b.package_id?'provisional_package_declined':'provisional_booking_declined',details:b.package_id?'Client did not accept the proposed private training package.':'Client did not accept the proposed appointment.'});
+ res.json({ok:true,packageDeclined:!!b.package_id});
 });
 app.post("/api/trainer/notes",requireTrainer,(req,res)=>{const {userId,petId,bookingId,note,clientVisible}=req.body;if(!userId||!String(note||"").trim())return res.status(400).json({error:"Client and note are required."});const id=db.prepare("INSERT INTO training_notes(user_id,pet_id,booking_id,note,client_visible) VALUES(?,?,?,?,?)").run(userId,petId||null,bookingId||null,String(note).trim(),clientVisible?1:0).lastInsertRowid;if(bookingId)db.prepare("INSERT INTO booking_history(booking_id,actor_role,action,details) VALUES(?,?,?,?)").run(bookingId,"trainer","note_added",String(note).trim());res.json({id})});
 app.get("/api/trainer/notes/:userId",requireTrainer,(req,res)=>res.json(db.prepare("SELECT n.*,p.name pet_name FROM training_notes n LEFT JOIN pets p ON p.id=n.pet_id WHERE n.user_id=? ORDER BY n.created_at DESC").all(req.params.userId)));

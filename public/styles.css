@@ -732,3 +732,7 @@ b,strong{font-weight:500}
 @media(max-width:520px){
   .trainer-booking-date-input{min-width:0!important}
 }
+
+/* v21.9.5 */
+.amy-bio{text-align:left!important}
+.meet-amy-actions{justify-content:center!important}

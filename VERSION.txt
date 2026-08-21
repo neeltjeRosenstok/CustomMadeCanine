@@ -1,9 +1,13 @@
-The Custom Made Canine v21.9.4 ONLINE TEST
+The Custom Made Canine v21.9.5 ONLINE TEST
 
-Very small date-picker correction:
-- Book for Client date field is now picker-only on desktop.
-- Keyboard typing/pasting into that native date field is blocked.
-- Clicking the date field opens the browser calendar picker.
-- Selecting a date still loads available times automatically.
-
-No booking, payment, package, notes, calendar, report, refund or media logic changed.
+Focused batch:
+- Meet Amy uses the newly uploaded cropped photo exactly as supplied.
+- Biography body is left aligned; buttons remain centered.
+- Needs Attention refreshes when opened and includes every refund-pending private booking.
+- Handle refund can open refund-pending bookings outside the currently loaded calendar.
+- Misleading “No dog linked” fallback removed.
+- Appointment Training plan / note is always client-facing.
+- Trainer-created provisional single booking: Accept booking and pay / Do not accept booking.
+- Manual Send Money remains inside payment flow, not on the provisional offer card.
+- Trainer-created provisional package is shown as one package offer with all session dates and one accept/decline decision.
+- Declining a proposed package releases all provisional sessions.

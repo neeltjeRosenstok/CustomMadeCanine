@@ -1,15 +1,19 @@
-v21.9.4 tiny date-picker hotfix
+v21.9.5 focused batch
 
 Replace in GitHub:
-- server.js
-- package.json
-- VERSION.txt
-- public/app.js
-- public/index.html
+server.js
+package.json
+VERSION.txt
+public/app.js
+public/styles.css
+public/index.html
+public/amy-ollie.jpg
 
 No database reset.
 
 After Render redeploys, Ctrl+F5 and test:
-Book for client → select client → click First date.
-The calendar picker should open; keyboard typing into DD/MM/YYYY should no longer be possible.
-Selecting a date should still load times automatically and allow the provisional booking/package flow.
+1. Meet Amy photo and text alignment.
+2. Needs Attention refund-pending booking + Handle refund.
+3. Appointment Training plan / note to client.
+4. Provisional single acceptance wording/payment.
+5. Provisional package shown once with one accept/decline decision.
