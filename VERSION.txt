@@ -1,13 +1,19 @@
-The Custom Made Canine v21.9.5 ONLINE TEST
+The Custom Made Canine v21.9.6 ONLINE TEST
 
-Focused batch:
-- Meet Amy uses the newly uploaded cropped photo exactly as supplied.
-- Biography body is left aligned; buttons remain centered.
-- Needs Attention refreshes when opened and includes every refund-pending private booking.
-- Handle refund can open refund-pending bookings outside the currently loaded calendar.
-- Misleading “No dog linked” fallback removed.
-- Appointment Training plan / note is always client-facing.
-- Trainer-created provisional single booking: Accept booking and pay / Do not accept booking.
-- Manual Send Money remains inside payment flow, not on the provisional offer card.
-- Trainer-created provisional package is shown as one package offer with all session dates and one accept/decline decision.
-- Declining a proposed package releases all provisional sessions.
+UI/payment stabilisation after v21.9.5:
+- All native browser alert/confirm/prompt calls are replaced by in-app dialogs.
+- Client class/private cancellations and trainer confirmations therefore no longer expose browser 'suppress dialogues'.
+- Client portal tabs/buttons have consistent rounded corners, padding and centred Review/Account text across iPad/iPhone/Android.
+- Amy appointment detail has a stable two-column desktop layout and retains the narrow single-column layout.
+- Successful automatic payment confirmation now has only Return to Client Portal.
+- Trainer-created package automatic payment preserves package payment type (fix for unresponsive package demo/automatic payment button).
+- Manual package payment is package-aware, validates fields clearly, stores one submission, prevents duplicate submissions, and shows Awaiting Amy payment verification.
+- Manual payment confirmation includes the WhatsApp Amy reminder.
+- iPad/manual M-Pesa form spacing prevents the submit button overlapping code/amount fields.
+- Partial/full refund amounts are shown explicitly to the client where refund data is present.
+
+Not included yet:
+- Old stranded class Awaiting payment recovery.
+- Amy's new Cash payment received / Complimentary / Other override.
+- Client credit balance.
+Those remain the next financial-workflow phase.

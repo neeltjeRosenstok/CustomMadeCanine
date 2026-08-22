@@ -736,3 +736,123 @@ b,strong{font-weight:500}
 /* v21.9.5 */
 .amy-bio{text-align:left!important}
 .meet-amy-actions{justify-content:center!important}
+
+
+/* v21.9.6 cross-device client portal navigation */
+.portal-menu-primary,
+.portal-menu-secondary{align-items:stretch}
+.portal-menu-primary button,
+.portal-menu-secondary button{
+  -webkit-appearance:none!important;
+  appearance:none!important;
+  border:2px solid var(--line)!important;
+  border-radius:12px!important;
+  box-sizing:border-box!important;
+  padding:11px 13px!important;
+  min-width:0!important;
+  overflow:hidden!important;
+  color:var(--navy)!important;
+  background:var(--white)!important;
+}
+.portal-menu-primary button{
+  text-align:left!important;
+  justify-content:center!important;
+}
+.portal-menu-primary button span,
+.portal-menu-primary button small{
+  max-width:100%;
+  overflow-wrap:anywhere;
+}
+.portal-menu-primary button.active{
+  border-color:var(--navy)!important;
+  background:rgba(255,253,248,.9)!important;
+}
+.portal-menu-secondary button{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+}
+.portal-menu-secondary button span{
+  width:100%;
+  text-align:center!important;
+  margin:0!important;
+}
+@media(min-width:600px) and (max-width:1024px){
+  .portal-menu-primary button{padding:12px 16px!important}
+}
+@media(max-width:480px){
+  .portal-menu-primary button{padding:10px 11px!important}
+}
+
+/* Stable Amy appointment details on desktop, single column on narrow screens */
+.trainer-booking-detail-modal{
+  width:min(900px,calc(100vw - 32px))!important;
+  max-width:900px!important;
+}
+.trainer-booking-detail-grid{
+  display:grid!important;
+  grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr)!important;
+  gap:22px!important;
+  align-items:start!important;
+}
+.trainer-booking-detail-grid>div{
+  min-width:0!important;
+}
+.trainer-booking-detail-grid textarea{
+  min-height:145px!important;
+}
+.trainer-booking-footer{
+  margin-top:18px!important;
+  padding-top:14px!important;
+  border-top:1px solid rgba(37,33,94,.18)!important;
+  display:flex!important;
+  flex-wrap:wrap!important;
+  gap:9px!important;
+}
+@media(max-width:760px){
+  .trainer-booking-detail-modal{width:calc(100vw - 18px)!important}
+  .trainer-booking-detail-grid{grid-template-columns:1fr!important;gap:12px!important}
+  .trainer-booking-footer{position:static!important}
+}
+
+/* Manual M-Pesa form: keep tablet controls and submit action separate */
+.manual-payment-box .form-grid{
+  margin-bottom:20px!important;
+  row-gap:14px!important;
+}
+.manual-payment-box>button{
+  display:block!important;
+  margin-top:12px!important;
+  margin-bottom:14px!important;
+}
+.manual-payment-box input{
+  box-sizing:border-box!important;
+}
+@media(max-width:1024px){
+  .manual-payment-box .form-grid{grid-template-columns:1fr!important}
+}
+
+/* In-app dialogues replace browser alert/confirm/prompt */
+.app-dialog-overlay{
+  position:fixed;inset:0;z-index:10000;
+  display:grid;place-items:center;
+  padding:18px;
+  background:rgba(37,33,94,.46);
+}
+.app-dialog-card{
+  width:min(520px,100%);
+  max-height:calc(100vh - 36px);
+  overflow:auto;
+  background:var(--white);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:20px;
+  box-shadow:0 18px 50px rgba(20,22,42,.22);
+}
+.app-dialog-card h3{margin-top:0}
+.app-dialog-card p{line-height:1.5}
+.app-dialog-actions{
+  justify-content:flex-end!important;
+  margin-top:18px!important;
+}

@@ -1,19 +1,24 @@
-v21.9.5 focused batch
+v21.9.6 UI/payment stabilisation
 
 Replace in GitHub:
-server.js
-package.json
-VERSION.txt
-public/app.js
-public/styles.css
-public/index.html
-public/amy-ollie.jpg
+- server.js
+- package.json
+- VERSION.txt
+- public/app.js
+- public/styles.css
+- public/index.html
 
 No database reset.
 
 After Render redeploys, Ctrl+F5 and test:
-1. Meet Amy photo and text alignment.
-2. Needs Attention refund-pending booking + Handle refund.
-3. Appointment Training plan / note to client.
-4. Provisional single acceptance wording/payment.
-5. Provisional package shown once with one accept/decline decision.
+1. Client portal tabs on PC/iPad/iPhone/Android.
+2. Client class cancellation: in-app dialogue, no browser suppress-dialogues control.
+3. Client private cancellation and Do not accept package: in-app dialogue.
+4. Amy appointment detail on desktop and narrow/mobile view.
+5. Automatic single booking payment: success screen has Return to Client Portal only.
+6. Trainer-created package automatic payment.
+7. Trainer-created package manual payment: code + amount submit once, then Awaiting Amy verification.
+8. iPad manual-payment spacing.
+9. Partial refund amount visible in client portal.
+
+The old class Awaiting payment recovery, Amy Payment received override, and client credit are deliberately not included in this build.
