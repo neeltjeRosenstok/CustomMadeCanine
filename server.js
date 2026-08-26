@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.7-online-test";
+const APP_VERSION = "21.9.8-online-test";
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -340,9 +340,9 @@ function expireTimedHolds(){
 }
 function futureClientCommitment(userId){
  const now=nairobiDateKey(0)+"T00:00:00";
- if(db.prepare("SELECT 1 FROM bookings WHERE user_id=? AND status IN ('confirmed','provisional','pending_payment') AND payment_status IN ('paid','demo_paid','pending') AND start_at>=? LIMIT 1").get(userId,now))return true;
- if(db.prepare("SELECT 1 FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.user_id=? AND e.enrolment_status='active' AND e.payment_status IN ('paid','demo_paid','pending') AND c.end_date>=? LIMIT 1").get(userId,nairobiDateKey(0)))return true;
- if(db.prepare("SELECT 1 FROM booking_packages WHERE user_id=? AND status IN ('provisional','confirmed') AND payment_status IN ('pending','paid','demo_paid') AND EXISTS(SELECT 1 FROM bookings b WHERE b.package_id=booking_packages.id AND b.start_at>=?) LIMIT 1").get(userId,now))return true;
+ if(db.prepare("SELECT 1 FROM bookings WHERE user_id=? AND status IN ('confirmed','provisional','pending_payment') AND payment_status IN ('paid','demo_paid','credit_paid','pending') AND start_at>=? LIMIT 1").get(userId,now))return true;
+ if(db.prepare("SELECT 1 FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.user_id=? AND e.enrolment_status='active' AND e.payment_status IN ('paid','demo_paid','credit_paid','pending') AND c.end_date>=? LIMIT 1").get(userId,nairobiDateKey(0)))return true;
+ if(db.prepare("SELECT 1 FROM booking_packages WHERE user_id=? AND status IN ('provisional','confirmed') AND payment_status IN ('pending','paid','demo_paid','credit_paid') AND EXISTS(SELECT 1 FROM bookings b WHERE b.package_id=booking_packages.id AND b.start_at>=?) LIMIT 1").get(userId,now))return true;
  return false;
 }
 function calculatedClientStatus(u){
@@ -370,6 +370,32 @@ function addClientCredit(userId,amount,sourceType,sourceId,note){
  db.prepare("INSERT INTO client_credit_ledger(user_id,amount_delta,source_type,source_id,note) VALUES(?,?,?,?,?)").run(userId,value,sourceType||null,sourceId||null,note||null);
  return clientCreditBalance(userId);
 }
+
+function normalizeMpesaReference(value){
+ return String(value||"").replace(/\s+/g,"").toUpperCase();
+}
+function paymentTargetForClient(userId,body){
+ const type=String(body.type||"private");
+ if(type==="package"){
+   let pkg=null;
+   if(body.packageId)pkg=db.prepare("SELECT * FROM booking_packages WHERE id=? AND user_id=?").get(Number(body.packageId),userId);
+   if(!pkg&&body.id){const b=db.prepare("SELECT package_id FROM bookings WHERE id=? AND user_id=?").get(Number(body.id),userId);if(b?.package_id)pkg=db.prepare("SELECT * FROM booking_packages WHERE id=? AND user_id=?").get(b.package_id,userId)}
+   if(!pkg)return null;
+   return {type:"package",row:pkg,total:Number(pkg.package_price||0),used:Number(pkg.credit_applied||0)};
+ }
+ if(type==="class"){
+   const row=db.prepare(`SELECT e.*,c.price FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.booking_ref=? AND e.user_id=?`).get(String(body.bookingRef||""),userId);
+   if(!row)return null;
+   return {type:"class",row,total:Number(row.price||0),used:Number(row.credit_applied||0)};
+ }
+ const row=db.prepare("SELECT * FROM bookings WHERE id=? AND user_id=?").get(Number(body.id),userId);
+ if(!row)return null;
+ return {type:"private",row,total:Number(row.price||0),used:Number(row.credit_applied||0)};
+}
+function paymentTargetRemaining(target){
+ return Math.max(0,Math.round(Number(target.total||0)-Number(target.used||0)));
+}
+
 function activeRescheduleHoldConflict(startAt,endAt,excludeBookingId=null){
  expireTimedHolds();
  return db.prepare("SELECT * FROM reschedule_requests WHERE status='pending' AND datetime(hold_expires_at)>datetime('now')").all().find(r=>Number(r.booking_id)!==Number(excludeBookingId||0)&&overlaps(startAt,endAt,r.proposed_start_at,r.proposed_buffer_end_at))||null;
@@ -457,6 +483,16 @@ try { db.exec("ALTER TABLE class_enrolments ADD COLUMN manual_payment_status TEX
 try { db.exec("ALTER TABLE schedule_blocks ADD COLUMN silent_calendar INTEGER NOT NULL DEFAULT 0"); } catch {}
 try { db.exec("ALTER TABLE bookings ADD COLUMN credit_amount INTEGER"); } catch {}
 try { db.exec("ALTER TABLE class_enrolments ADD COLUMN credit_amount INTEGER"); } catch {}
+try { db.exec("ALTER TABLE bookings ADD COLUMN credit_applied INTEGER NOT NULL DEFAULT 0"); } catch {}
+try { db.exec("ALTER TABLE bookings ADD COLUMN payment_received_at TEXT"); } catch {}
+try { db.exec("ALTER TABLE bookings ADD COLUMN mpesa_receipt_number TEXT"); } catch {}
+try { db.exec("ALTER TABLE booking_packages ADD COLUMN credit_applied INTEGER NOT NULL DEFAULT 0"); } catch {}
+try { db.exec("ALTER TABLE booking_packages ADD COLUMN payment_received_at TEXT"); } catch {}
+try { db.exec("ALTER TABLE booking_packages ADD COLUMN mpesa_receipt_number TEXT"); } catch {}
+try { db.exec("ALTER TABLE class_enrolments ADD COLUMN credit_applied INTEGER NOT NULL DEFAULT 0"); } catch {}
+try { db.exec("ALTER TABLE class_enrolments ADD COLUMN payment_received_at TEXT"); } catch {}
+try { db.exec("ALTER TABLE class_enrolments ADD COLUMN mpesa_receipt_number TEXT"); } catch {}
+
 
 db.exec(`CREATE TABLE IF NOT EXISTS booking_packages (
  id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -794,7 +830,7 @@ app.get("/api/auth/me",(req,res)=>res.json({user:currentUser(req)}));
 app.get("/api/classes",(req,res)=>{
   const rows=db.prepare(`
     SELECT c.*,
-      (SELECT COUNT(*) FROM class_enrolments e WHERE e.class_id=c.id AND e.enrolment_status='active' AND e.payment_status IN ('pending','paid','demo_paid')) enrolled
+      (SELECT COUNT(*) FROM class_enrolments e WHERE e.class_id=c.id AND e.enrolment_status='active' AND e.payment_status IN ('pending','paid','demo_paid','credit_paid')) enrolled
     FROM classes c ORDER BY c.start_date,c.start_time
   `).all().map(c=>({...c,remaining:Math.max(0,c.capacity-c.enrolled),sessions:db.prepare("SELECT * FROM class_sessions WHERE class_id=? ORDER BY session_date").all(c.id)}));
   res.json(rows);
@@ -934,7 +970,7 @@ app.get("/api/availability",async(req,res)=>{
 
       if(serviceUnavailable(locationType,start,bufferEnd)) continue;
       if(scheduleBlockConflict(locationType,start,bufferEnd)) continue;
-      const existing=db.prepare("SELECT start_at,buffer_end_at FROM bookings WHERE status NOT IN ('cancelled','expired') AND payment_status IN ('pending','paid','demo_paid')").all();
+      const existing=db.prepare("SELECT start_at,buffer_end_at FROM bookings WHERE status NOT IN ('cancelled','expired') AND payment_status IN ('pending','paid','demo_paid','credit_paid')").all();
       const blocked=db.prepare("SELECT start_at,end_at FROM availability_blocks").all();
       const classSessions=db.prepare("SELECT session_date,start_time,end_time FROM class_sessions").all();
 
@@ -973,7 +1009,7 @@ app.post("/api/bookings/private",requireAuth,async(req,res)=>{
   if(recurringBlockConflict(startAt,endAt)) return res.status(409).json({error:"This time is blocked in Amy's recurring schedule."});
   if(serviceUnavailable(locationType,startAt,bufferEnd)) return res.status(409).json({error:locationType==="home"?"Home visits are unavailable at that time.":"Amy's arena is unavailable at that time."});
   const unifiedBlock=scheduleBlockConflict(locationType,startAt,bufferEnd);if(unifiedBlock)return res.status(409).json({error:unifiedBlock.public_message||unifiedBlock.reason||"That time is blocked."});
-  const existing=db.prepare("SELECT start_at,buffer_end_at FROM bookings WHERE status!='cancelled' AND payment_status IN ('pending','paid','demo_paid')").all();
+  const existing=db.prepare("SELECT start_at,buffer_end_at FROM bookings WHERE status!='cancelled' AND payment_status IN ('pending','paid','demo_paid','credit_paid')").all();
   if(existing.some(x=>overlaps(startAt,bufferEnd,x.start_at,x.buffer_end_at))||activeRescheduleHoldConflict(startAt,bufferEnd)) return res.status(409).json({error:"That time is no longer available."});
   const blocks=db.prepare("SELECT start_at,end_at FROM availability_blocks").all();
   if(blocks.some(x=>overlaps(startAt,bufferEnd,x.start_at,x.end_at))) return res.status(409).json({error:"That time is blocked."});
@@ -988,19 +1024,23 @@ app.post("/api/bookings/private",requireAuth,async(req,res)=>{
     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
   `).run(req.user.id,petId||null,bookingRef,service,locationType,address||null,startAt,endAt,bufferEnd,travel,price,"pending","pending_payment",notes||null,holdExpires).lastInsertRowid;
   logActivity({userId:req.user.id,petId:Number(petId),actorUserId:req.user.id,actorRole:'client',action:'booking_started',details:`Private booking ${bookingRef} created; payment pending.`});
+  const creditAvailable=clientCreditBalance(req.user.id);
+  if(creditAvailable>0){
+    return res.json({bookingRef,id,amount:price,holdExpiresAt:holdExpires,firstAppointment:isFirstAppointmentForDog(petId),creditAvailable,creditApplied:0,paymentStartRequired:true,mpesaDemo:false,mpesaMessage:"Client credit is available. Apply it first, or continue with M-Pesa."});
+  }
   try {
     const payPhone=req.user.mpesa_phone||req.user.phone;
     const mpesa=await initiateMpesa(payPhone,price,bookingRef);
     db.prepare("UPDATE bookings SET mpesa_request_id=? WHERE id=?").run(mpesa.checkoutRequestId,id);
-    res.json({bookingRef,id,amount:price,holdExpiresAt:holdExpires,firstAppointment:isFirstAppointmentForDog(petId),mpesaDemo:mpesa.demo,mpesaMessage:mpesa.demo?"Demo payment mode: press Confirm payment in the trial.":"Check your M-Pesa phone for the prompt."});
+    res.json({bookingRef,id,amount:price,holdExpiresAt:holdExpires,firstAppointment:isFirstAppointmentForDog(petId),creditAvailable:0,creditApplied:0,mpesaDemo:mpesa.demo,mpesaMessage:mpesa.demo?"Demo payment mode: complete the trial payment.":"M-Pesa prompt sent. Approve it on your phone."});
   } catch(e) {
-    res.status(502).json({error:(e.message||"Could not start M-Pesa payment.")+" Your booking is still held for 24 hours; you can resume payment or use M-Pesa Send Money from your Client Portal.",bookingRef,id,amount:price,holdExpiresAt:holdExpires,firstAppointment:isFirstAppointmentForDog(petId),paymentPending:true});
+    res.status(502).json({error:(e.message||"Could not start M-Pesa payment.")+" Your booking is still held for 24 hours. Retry the STK Push or use the manual fallback on the payment screen.",bookingRef,id,amount:price,holdExpiresAt:holdExpires,firstAppointment:isFirstAppointmentForDog(petId),creditAvailable:0,creditApplied:0,paymentPending:true});
   }
 });
 
 app.post("/api/bookings/:ref/demo-pay",requireAuth,(req,res)=>{
   if(!String(req.params.ref).startsWith("PRV-")) return res.status(400).json({error:"Demo payment unavailable."});
-  const r=db.prepare("UPDATE bookings SET payment_status='demo_paid',status='confirmed' WHERE booking_ref=? AND user_id=? AND payment_status='pending'").run(req.params.ref,req.user.id);
+  const r=db.prepare("UPDATE bookings SET payment_status='demo_paid',status='confirmed',payment_received_at=CURRENT_TIMESTAMP WHERE booking_ref=? AND user_id=? AND payment_status='pending'").run(req.params.ref,req.user.id);
   if(!r.changes) return res.status(404).json({error:"Booking not found."});
   res.json({ok:true});
 });
@@ -1023,7 +1063,7 @@ app.post("/api/my/class-enrolments/:id/cancel",requireAuth,(req,res)=>{
  const e=db.prepare(`SELECT e.*,c.title,c.price,p.name pet_name FROM class_enrolments e JOIN classes c ON c.id=e.class_id LEFT JOIN pets p ON p.id=e.pet_id WHERE e.id=? AND e.user_id=?`).get(req.params.id,req.user.id);
  if(!e)return res.status(404).json({error:"Class enrolment not found."});
  if(e.enrolment_status!=="active")return res.status(409).json({error:"This class enrolment is already cancelled."});
- const note=String(req.body.note||"").trim();const paid=["paid","demo_paid"].includes(e.payment_status);
+ const note=String(req.body.note||"").trim();const paid=["paid","demo_paid","credit_paid"].includes(e.payment_status);
  db.prepare("UPDATE class_enrolments SET enrolment_status='cancelled_by_client',rejected_reason=?,rejected_at=CURRENT_TIMESTAMP,rejected_by=?,payment_status=? WHERE id=?").run(note||"Cancelled by client",req.user.id,paid?"refund_pending":"cancelled",e.id);
  logActivity({userId:req.user.id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"client",action:"class_cancel_requested",details:`${e.pet_name||"Dog"} cancelled from ${e.title}.${note?` Note: ${note}`:""}${paid?" Refund decision required.":""}`});
  res.json({ok:true,refundPending:paid});
@@ -1035,7 +1075,7 @@ app.post("/api/classes/:id/enrol",requireAuth,(req,res)=>{
   if(!req.body.termsAccepted)return res.status(400).json({error:"Please acknowledge the Booking Terms & Cancellation Policy before confirming."});
   const c=db.prepare("SELECT * FROM classes WHERE id=?").get(req.params.id);
   if(!c) return res.status(404).json({error:"Class not found."});
-  const count=db.prepare("SELECT COUNT(*) c FROM class_enrolments WHERE class_id=? AND enrolment_status='active' AND payment_status IN ('pending','paid','demo_paid')").get(c.id).c;
+  const count=db.prepare("SELECT COUNT(*) c FROM class_enrolments WHERE class_id=? AND enrolment_status='active' AND payment_status IN ('pending','paid','demo_paid','credit_paid')").get(c.id).c;
   if(count>=c.capacity) return res.status(409).json({error:"This class is full."});
   const firstSession=db.prepare("SELECT session_date FROM class_sessions WHERE class_id=? ORDER BY session_date LIMIT 1").get(c.id);
   if(!firstSession) return res.status(400).json({error:"Class schedule is incomplete."});
@@ -1076,13 +1116,13 @@ app.post("/api/classes/:id/enrol",requireAuth,(req,res)=>{
     db.prepare("INSERT INTO class_enrolments(class_id,user_id,pet_id,booking_ref,payment_status,enrolment_status,hold_expires_at,terms_accepted_at) VALUES(?,?,?,?,?,'active',?,CURRENT_TIMESTAMP)")
       .run(c.id,req.user.id,petId,bookingRef,"pending",addHoursIso(24));
     logActivity({userId:req.user.id,petId,classId:c.id,actorUserId:req.user.id,actorRole:"client",action:"class_enrolled",details:`${pet.name} enrolled in ${c.title}.`});
-    res.json({bookingRef,amount:c.price,mpesaDemo:true,mpesaMessage:"Trial mode: confirm payment to complete enrolment."});
+    res.json({bookingRef,amount:c.price,creditAvailable:clientCreditBalance(req.user.id),creditApplied:0,mpesaDemo:true,mpesaMessage:"Trial mode: complete the trial payment to confirm enrolment."});
   } catch(e) {
     res.status(409).json({error:`${pet.name} already has an enrolment record for this course.`});
   }
 });
 app.post("/api/classes/:ref/demo-pay",requireAuth,(req,res)=>{
-  const r=db.prepare("UPDATE class_enrolments SET payment_status='demo_paid' WHERE booking_ref=? AND user_id=? AND payment_status='pending' AND enrolment_status='active'").run(req.params.ref,req.user.id);
+  const r=db.prepare("UPDATE class_enrolments SET payment_status='demo_paid',payment_received_at=CURRENT_TIMESTAMP WHERE booking_ref=? AND user_id=? AND payment_status='pending' AND enrolment_status='active'").run(req.params.ref,req.user.id);
   if(!r.changes) return res.status(404).json({error:"Enrolment not found."});
   res.json({ok:true});
 });
@@ -1335,12 +1375,12 @@ app.get("/api/trainer/calendar",requireTrainer,(req,res)=>{
            u.name client,u.phone,p.name pet_name,p.breed pet_breed
     FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id
     WHERE substr(b.start_at,1,10)>=? AND substr(b.start_at,1,10)<=?
-      AND b.status NOT IN ('cancelled','expired') AND b.payment_status IN ('paid','demo_paid','pending')
+      AND b.status NOT IN ('cancelled','expired') AND b.payment_status IN ('paid','demo_paid','credit_paid','pending')
     ORDER BY b.start_at
   `).all(start,end);
   const classRows=db.prepare(`
     SELECT s.id session_id,s.session_date,s.start_time,s.end_time,c.id class_id,c.title,c.capacity,c.location_type,c.location_name,
-           (SELECT COUNT(*) FROM class_enrolments e WHERE e.class_id=c.id AND e.enrolment_status='active' AND e.payment_status IN ('pending','paid','demo_paid')) enrolled
+           (SELECT COUNT(*) FROM class_enrolments e WHERE e.class_id=c.id AND e.enrolment_status='active' AND e.payment_status IN ('pending','paid','demo_paid','credit_paid')) enrolled
     FROM class_sessions s JOIN classes c ON c.id=s.class_id
     WHERE s.session_date>=? AND s.session_date<=? AND c.status='open'
     ORDER BY s.session_date,s.start_time
@@ -1355,7 +1395,7 @@ app.get("/api/trainer/summary",requireTrainer,(req,res)=>{
   expireTimedHolds(); const today=nairobiDateKey(0);
   res.json({
     todayBookings:db.prepare("SELECT b.*,u.name client,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE substr(b.start_at,1,10)=? AND b.status NOT IN ('cancelled','expired') ORDER BY b.start_at").all(today),
-    classes:db.prepare("SELECT c.*,(SELECT COUNT(*) FROM class_enrolments e WHERE e.class_id=c.id AND e.enrolment_status='active' AND e.payment_status IN ('pending','paid','demo_paid')) enrolled FROM classes c ORDER BY c.start_date DESC").all(),
+    classes:db.prepare("SELECT c.*,(SELECT COUNT(*) FROM class_enrolments e WHERE e.class_id=c.id AND e.enrolment_status='active' AND e.payment_status IN ('pending','paid','demo_paid','credit_paid')) enrolled FROM classes c ORDER BY c.start_date DESC").all(),
     pendingReviews:db.prepare("SELECT r.*,u.name FROM reviews r JOIN users u ON u.id=r.user_id WHERE r.status='pending' ORDER BY r.created_at DESC").all(),
     vaccinationAttention:db.prepare(`SELECT p.id pet_id,p.name pet_name,p.breed,p.vaccination_status,p.vaccination_verified_at,u.id user_id,u.name client_name,(SELECT COUNT(*) FROM pet_files f WHERE f.pet_id=p.id AND f.kind='vaccination') vaccination_count FROM pets p JOIN users u ON u.id=p.user_id WHERE COALESCE(p.archived,0)=0 AND p.vaccination_status IN ('pending','rejected','not_provided') ORDER BY p.name`).all(),
     cancellationAttention:db.prepare(`SELECT b.id,b.user_id,b.pet_id,b.booking_ref,b.start_at,b.end_at,b.service,b.location_type,b.address,b.payment_status,b.status,b.price,b.package_id,b.refund_amount,b.refund_confirmation_code,b.credit_amount,u.name client_name,u.email client_email,COALESCE(u.whatsapp_phone,u.phone) client_phone,p.name pet_name,bp.name package_name,bp.package_price FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id LEFT JOIN booking_packages bp ON bp.id=b.package_id WHERE b.payment_status='refund_pending' ORDER BY b.start_at DESC`).all().map(b=>({...b,refundable_amount:packageSessionRefundableAmount(b)})),
@@ -1377,7 +1417,7 @@ app.post("/api/trainer/schedule-blocks",requireTrainer,(req,res)=>{
  let d=startDate,days=0,conflicts=[],classConflicts=[];
  while(d<=endDate&&days<367){
    const st=`${d}T${allDay?"00:00:00":startTime+":00"}`,en=`${d}T${allDay?"23:59:59":endTime+":00"}`;
-   const bookings=db.prepare(`SELECT b.id,b.booking_ref,b.start_at,b.end_at,b.buffer_end_at,b.location_type,u.name client,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE substr(b.start_at,1,10)=? AND b.status!='cancelled' AND b.payment_status IN ('pending','paid','demo_paid')`).all(d).filter(b=>(target==="amy"||b.location_type===target)&&overlaps(st,en,b.start_at,b.buffer_end_at||b.end_at));
+   const bookings=db.prepare(`SELECT b.id,b.booking_ref,b.start_at,b.end_at,b.buffer_end_at,b.location_type,u.name client,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE substr(b.start_at,1,10)=? AND b.status!='cancelled' AND b.payment_status IN ('pending','paid','demo_paid','credit_paid')`).all(d).filter(b=>(target==="amy"||b.location_type===target)&&overlaps(st,en,b.start_at,b.buffer_end_at||b.end_at));
    conflicts.push(...bookings);
    if(target!=="home"){
      const rows=db.prepare(`SELECT s.session_date,s.start_time,s.end_time,c.title,c.location_type FROM class_sessions s JOIN classes c ON c.id=s.class_id WHERE s.session_date=? AND c.status!='cancelled'`).all(d).filter(x=>(target==="amy"||(target==="arena"&&COALESCE_CLASS_ARENA(x)))&&overlaps(st,en,isoDateTime(x.session_date,x.start_time),isoDateTime(x.session_date,x.end_time)));
@@ -1456,7 +1496,7 @@ app.post("/api/trainer/service-availability",requireTrainer,(req,res)=>{
   const conflicts=db.prepare(`
     SELECT b.id,b.booking_ref,b.start_at,b.end_at,b.location_type,u.name client,p.name pet_name
     FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id
-    WHERE b.status!='cancelled' AND b.payment_status IN ('pending','paid','demo_paid') AND b.location_type=?
+    WHERE b.status!='cancelled' AND b.payment_status IN ('pending','paid','demo_paid','credit_paid') AND b.location_type=?
   `).all(locationType).filter(b=>startMs<wallClockMs(b.end_at)&&endMs>wallClockMs(b.start_at));
   if(conflicts.length)return res.status(409).json({error:"Existing bookings use this location during the selected dates. Reschedule or cancel them before adding the restriction.",conflicts});
   if(locationType==="arena"){
@@ -1493,7 +1533,7 @@ app.post("/api/trainer/location-plan",requireTrainer,(req,res)=>{
   const sorted=[...clean].sort((x,y)=>x.start_time.localeCompare(y.start_time));for(let i=1;i<sorted.length;i++)if(sorted[i].start_time<sorted[i-1].end_time)return res.status(400).json({error:"Location-plan periods cannot overlap."});
   if(clean.length){
     const allowed=(type,start,end)=>clean.some(p=>p[type==="arena"?"arena_enabled":"home_enabled"]&&String(start).slice(11,16)>=p.start_time&&String(end).slice(11,16)<=p.end_time);
-    const bookings=db.prepare("SELECT b.*,u.name client,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE substr(b.start_at,1,10)=? AND b.status!='cancelled' AND b.payment_status IN ('pending','paid','demo_paid')").all(date);
+    const bookings=db.prepare("SELECT b.*,u.name client,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE substr(b.start_at,1,10)=? AND b.status!='cancelled' AND b.payment_status IN ('pending','paid','demo_paid','credit_paid')").all(date);
     const badBookings=bookings.filter(b=>!allowed(b.location_type,b.start_at,b.end_at));
     const classRows=db.prepare("SELECT s.*,c.title FROM class_sessions s JOIN classes c ON c.id=s.class_id WHERE s.session_date=? AND c.status!='cancelled' AND COALESCE(c.location_type,'arena')='arena'").all(date);
     const badClasses=classRows.filter(x=>!allowed("arena",isoDateTime(x.session_date,x.start_time),isoDateTime(x.session_date,x.end_time)));
@@ -1514,7 +1554,7 @@ app.post("/api/trainer/recurring-blocks",requireTrainer,(req,res)=>{
  if(endDate&&!/^\d{4}-\d{2}-\d{2}$/.test(endDate))return res.status(400).json({error:"Choose a valid last date."});
  if(startDate&&endDate&&endDate<startDate)return res.status(400).json({error:"The last date must be on or after the first date."});
  const applies=date=>{if(startDate&&date<startDate)return false;if(endDate&&date>endDate)return false;return weekdays.includes(new Date(`${date}T12:00:00`).getDay())};
- const bookings=db.prepare(`SELECT b.id,b.booking_ref,b.start_at,b.end_at,u.name client,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE b.status!='cancelled' AND b.payment_status IN ('pending','paid','demo_paid')`).all()
+ const bookings=db.prepare(`SELECT b.id,b.booking_ref,b.start_at,b.end_at,u.name client,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE b.status!='cancelled' AND b.payment_status IN ('pending','paid','demo_paid','credit_paid')`).all()
    .filter(b=>{const d=String(b.start_at).slice(0,10),st=String(b.start_at).slice(11,16),en=String(b.end_at).slice(11,16);return applies(d)&&st<end&&en>start});
  const classes=db.prepare(`SELECT s.session_date,s.start_time,s.end_time,c.title FROM class_sessions s JOIN classes c ON c.id=s.class_id WHERE c.status!='cancelled'`).all()
    .filter(x=>applies(x.session_date)&&x.start_time<end&&x.end_time>start);
@@ -1549,7 +1589,7 @@ app.post("/api/trainer/working-hours/exception",requireTrainer,(req,res)=>{
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return res.status(400).json({error:"Choose a date."});
   if(enabled&&(!/^\d{2}:\d{2}$/.test(start)||!/^\d{2}:\d{2}$/.test(end)||start>=end))return res.status(400).json({error:"Choose valid exception hours."});
   const allowedStart=enabled?`${date}T${start}:00`:null,allowedEnd=enabled?`${date}T${end}:00`:null;
-  const bookings=db.prepare("SELECT b.*,u.name client,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE substr(b.start_at,1,10)=? AND b.status!='cancelled' AND b.payment_status IN ('pending','paid','demo_paid')").all(date);
+  const bookings=db.prepare("SELECT b.*,u.name client,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE substr(b.start_at,1,10)=? AND b.status!='cancelled' AND b.payment_status IN ('pending','paid','demo_paid','credit_paid')").all(date);
   const badBookings=enabled?bookings.filter(b=>wallClockMs(b.start_at)<wallClockMs(allowedStart)||wallClockMs(b.end_at)>wallClockMs(allowedEnd)):bookings;
   const classes=db.prepare("SELECT s.*,c.title FROM class_sessions s JOIN classes c ON c.id=s.class_id WHERE s.session_date=? AND c.status!='cancelled'").all(date);
   const badClasses=enabled?classes.filter(x=>x.start_time<start||x.end_time>end):classes;
@@ -1631,7 +1671,7 @@ app.post("/api/trainer/class-enrolments/:id/reject",requireTrainer,(req,res)=>{
   if(e.enrolment_status==='rejected')return res.status(409).json({error:"This dog has already been rejected from the class."});
   const reason=String(req.body.reason||"").trim();
   if(!reason)return res.status(400).json({error:"Please record a short reason for rejecting this dog from the class."});
-  const paid=['paid','demo_paid'].includes(e.payment_status);
+  const paid=['paid','demo_paid','credit_paid'].includes(e.payment_status);
   db.prepare(`UPDATE class_enrolments
               SET enrolment_status='rejected',rejected_reason=?,rejected_at=CURRENT_TIMESTAMP,rejected_by=?,
                   payment_status=?
@@ -1695,7 +1735,7 @@ app.put("/api/trainer/classes/:id",requireTrainer,(req,res)=>{
   for(const date of dates){
     const st=isoDateTime(date,startTime),en=isoDateTime(date,endTime);
     const blocks=db.prepare("SELECT * FROM availability_blocks WHERE start_at < ? AND end_at > ?").all(en,st);
-    const bookings=db.prepare("SELECT b.booking_ref,b.start_at,b.end_at,u.name client FROM bookings b JOIN users u ON u.id=b.user_id WHERE b.status!='cancelled' AND b.payment_status IN ('paid','demo_paid','pending')").all().filter(b=>overlaps(st,en,b.start_at,b.buffer_end_at));
+    const bookings=db.prepare("SELECT b.booking_ref,b.start_at,b.end_at,u.name client FROM bookings b JOIN users u ON u.id=b.user_id WHERE b.status!='cancelled' AND b.payment_status IN ('paid','demo_paid','credit_paid','pending')").all().filter(b=>overlaps(st,en,b.start_at,b.buffer_end_at));
     const classes=db.prepare("SELECT s.session_date,s.start_time,s.end_time,c.title FROM class_sessions s JOIN classes c ON c.id=s.class_id WHERE c.status='open' AND c.id!=?").all(current.id).filter(x=>overlaps(st,en,isoDateTime(x.session_date,x.start_time),isoDateTime(x.session_date,x.end_time)));
     const arenaUnavailable=(chosenLocation==="arena"&&serviceUnavailable("arena",st,en))||scheduleBlockConflict(chosenLocation==="arena"?"arena":"alternate",st,en);
     if(blocks.length||bookings.length||classes.length||arenaUnavailable)conflicts.push({date,blocks,bookings,classes,arenaUnavailable});
@@ -1758,7 +1798,7 @@ app.post("/api/trainer/classes",requireTrainer,(req,res)=>{
   for(const date of dates){
     const s=isoDateTime(date,startTime),e=isoDateTime(date,endTime);
     const blocks=db.prepare("SELECT * FROM availability_blocks WHERE start_at < ? AND end_at > ?").all(e,s);
-    const bookings=db.prepare("SELECT b.booking_ref,b.start_at,b.end_at,u.name client FROM bookings b JOIN users u ON u.id=b.user_id WHERE b.status!='cancelled' AND b.payment_status IN ('paid','demo_paid','pending')").all().filter(b=>overlaps(s,e,b.start_at,b.buffer_end_at));
+    const bookings=db.prepare("SELECT b.booking_ref,b.start_at,b.end_at,u.name client FROM bookings b JOIN users u ON u.id=b.user_id WHERE b.status!='cancelled' AND b.payment_status IN ('paid','demo_paid','credit_paid','pending')").all().filter(b=>overlaps(s,e,b.start_at,b.buffer_end_at));
     const classes=db.prepare("SELECT s.session_date,s.start_time,s.end_time,c.title FROM class_sessions s JOIN classes c ON c.id=s.class_id WHERE c.status='open'").all().filter(x=>overlaps(s,e,isoDateTime(x.session_date,x.start_time),isoDateTime(x.session_date,x.end_time)));
     const arenaUnavailable=(chosenLocation==="arena"&&serviceUnavailable("arena",s,e))||scheduleBlockConflict(chosenLocation==="arena"?"arena":"alternate",s,e);
     if(blocks.length||bookings.length||classes.length||arenaUnavailable)conflicts.push({date,blocks,bookings,classes,arenaUnavailable});
@@ -1796,7 +1836,7 @@ app.post("/api/trainer/clients/:userId/provisional-booking",requireTrainer,async
   else {for(let i=0;i<n;i++){const step=mode==='biweekly'?14:mode==='weekly'?7:0;const d=new Date(first);d.setDate(d.getDate()+i*step);dates.push(wallClockIso(d.getTime()))}}
   if(dates.length!==n)return res.status(400).json({error:`Please provide exactly ${n} session dates.`});
   const travel=locationType==='home'?await routeTravelMinutes(address,'Nairobi, Kenya'):0,buffer=locationType==='arena'?0:Math.max(30,travel),proposed=[];
-  for(const st of dates){const en=addMinutes(st,duration),be=addMinutes(en,buffer);if(!withinWorkingHours(st,en)||recurringBlockConflict(st,en)||serviceUnavailable(locationType,st,be)||scheduleBlockConflict(locationType,st,be)||activeRescheduleHoldConflict(st,be))return res.status(409).json({error:`${st.slice(0,10)} ${st.slice(11,16)} is unavailable.`});const existing=db.prepare("SELECT * FROM bookings WHERE status NOT IN ('cancelled','expired') AND payment_status IN ('pending','paid','demo_paid')").all();if(existing.some(x=>overlaps(st,be,x.start_at,x.buffer_end_at)))return res.status(409).json({error:`${st.slice(0,10)} ${st.slice(11,16)} conflicts with another booking.`});const classes=db.prepare("SELECT * FROM class_sessions").all();if(classes.some(x=>overlaps(st,be,isoDateTime(x.session_date,x.start_time),isoDateTime(x.session_date,x.end_time))))return res.status(409).json({error:`${st.slice(0,10)} ${st.slice(11,16)} overlaps a class.`});proposed.push({st,en,be})}
+  for(const st of dates){const en=addMinutes(st,duration),be=addMinutes(en,buffer);if(!withinWorkingHours(st,en)||recurringBlockConflict(st,en)||serviceUnavailable(locationType,st,be)||scheduleBlockConflict(locationType,st,be)||activeRescheduleHoldConflict(st,be))return res.status(409).json({error:`${st.slice(0,10)} ${st.slice(11,16)} is unavailable.`});const existing=db.prepare("SELECT * FROM bookings WHERE status NOT IN ('cancelled','expired') AND payment_status IN ('pending','paid','demo_paid','credit_paid')").all();if(existing.some(x=>overlaps(st,be,x.start_at,x.buffer_end_at)))return res.status(409).json({error:`${st.slice(0,10)} ${st.slice(11,16)} conflicts with another booking.`});const classes=db.prepare("SELECT * FROM class_sessions").all();if(classes.some(x=>overlaps(st,be,isoDateTime(x.session_date,x.start_time),isoDateTime(x.session_date,x.end_time))))return res.status(409).json({error:`${st.slice(0,10)} ${st.slice(11,16)} overlaps a class.`});proposed.push({st,en,be})}
   const standardPrice={consultation:5000,standard:4000,extra:6000}[service],totalPrice=Number(packagePrice)>0?Number(packagePrice):standardPrice*n,hold=addHoursIso(24);
   let packageId=null;if(n>1){packageId=db.prepare("INSERT INTO booking_packages(user_id,pet_id,name,service,location_type,address,package_price,payment_status,status,hold_expires_at) VALUES(?,?,?,?,?,?,?,'pending','provisional',?)").run(user.id,pet.id,String(packageName||`${pet.name} – ${n} Session Training Package`).trim(),service,locationType,address||null,totalPrice,hold).lastInsertRowid}
   const ids=[];for(const p of proposed){const refCode=ref('PRV');const id=db.prepare("INSERT INTO bookings(user_id,pet_id,booking_ref,service,location_type,address,start_at,end_at,buffer_end_at,travel_minutes,price,payment_status,status,notes,hold_expires_at,package_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(user.id,pet.id,refCode,service,locationType,address||null,p.st,p.en,p.be,travel,packageId?0:totalPrice,'pending','provisional',packageId?'Part of provisional package created by Amy.':'Created by Amy; client confirmation and payment required.',hold,packageId).lastInsertRowid;ids.push(id);db.prepare("INSERT INTO booking_history(booking_id,actor_role,action,details) VALUES(?,?,?,?)").run(id,'trainer','provisional_created',`Held until ${hold}`)}
@@ -1804,9 +1844,21 @@ app.post("/api/trainer/clients/:userId/provisional-booking",requireTrainer,async
   res.json({ok:true,ids,packageId,holdExpiresAt:hold,amount:totalPrice});
 });
 app.post("/api/my/bookings/:id/accept-provisional",requireAuth,async(req,res)=>{
-  expireTimedHolds(); const b=db.prepare("SELECT * FROM bookings WHERE id=? AND user_id=?").get(req.params.id,req.user.id);if(!b||b.status!=='provisional'||b.payment_status!=='pending')return res.status(404).json({error:"This provisional booking is no longer available."});if(expiryIsPast(b.hold_expires_at))return res.status(409).json({error:"The 24-hour hold has expired. Please contact Amy or book again."});
-  const pkg=b.package_id?db.prepare("SELECT * FROM booking_packages WHERE id=? AND user_id=?").get(b.package_id,req.user.id):null;const amount=pkg?Number(pkg.package_price):Number(b.price),reference=pkg?`PKG-${pkg.id}`:b.booking_ref;
-  try{const mpesa=await initiateMpesa(req.user.mpesa_phone||req.user.phone,amount,reference);if(pkg){db.prepare("UPDATE booking_packages SET mpesa_request_id=? WHERE id=?").run(mpesa.checkoutRequestId,pkg.id)}else db.prepare("UPDATE bookings SET mpesa_request_id=? WHERE id=?").run(mpesa.checkoutRequestId,b.id);res.json({bookingRef:reference,id:b.id,packageId:pkg?.id||null,amount,holdExpiresAt:b.hold_expires_at,firstAppointment:isFirstAppointmentForDog(b.pet_id),mpesaDemo:mpesa.demo,mpesaMessage:mpesa.demo?"Demo payment mode: press Confirm payment in the trial.":"Check your M-Pesa phone for the prompt.",type:pkg?'package':'private'});}catch(e){res.status(502).json({error:(e.message||'Could not start M-Pesa payment.')+' The hold remains active; you can retry or use Send Money.',bookingRef:reference,id:b.id,packageId:pkg?.id||null,amount,paymentPending:true});}
+ expireTimedHolds();
+ const b=db.prepare("SELECT * FROM bookings WHERE id=? AND user_id=?").get(req.params.id,req.user.id);
+ if(!b||b.status!=='provisional'||b.payment_status!=='pending')return res.status(404).json({error:"This provisional booking is no longer available."});
+ if(expiryIsPast(b.hold_expires_at))return res.status(409).json({error:"The 24-hour hold has expired. Please contact Amy or book again."});
+ const pkg=b.package_id?db.prepare("SELECT * FROM booking_packages WHERE id=? AND user_id=?").get(b.package_id,req.user.id):null;
+ const amount=pkg?Number(pkg.package_price):Number(b.price),reference=pkg?`PKG-${pkg.id}`:b.booking_ref,creditAvailable=clientCreditBalance(req.user.id);
+ if(creditAvailable>0)return res.json({bookingRef:reference,id:b.id,packageId:pkg?.id||null,amount,holdExpiresAt:b.hold_expires_at,firstAppointment:isFirstAppointmentForDog(b.pet_id),creditAvailable,creditApplied:Number(pkg?.credit_applied||b.credit_applied||0),paymentStartRequired:true,mpesaDemo:false,mpesaMessage:"Client credit is available. Apply it first, or continue with M-Pesa.",type:pkg?'package':'private'});
+ try{
+  const mpesa=await initiateMpesa(req.user.mpesa_phone||req.user.phone,amount,reference);
+  if(pkg)db.prepare("UPDATE booking_packages SET mpesa_request_id=? WHERE id=?").run(mpesa.checkoutRequestId,pkg.id);
+  else db.prepare("UPDATE bookings SET mpesa_request_id=? WHERE id=?").run(mpesa.checkoutRequestId,b.id);
+  res.json({bookingRef:reference,id:b.id,packageId:pkg?.id||null,amount,holdExpiresAt:b.hold_expires_at,firstAppointment:isFirstAppointmentForDog(b.pet_id),creditAvailable:0,creditApplied:Number(pkg?.credit_applied||b.credit_applied||0),mpesaDemo:mpesa.demo,mpesaMessage:mpesa.demo?"Demo payment mode: complete the trial payment.":"M-Pesa prompt sent. Approve it on your phone.",type:pkg?'package':'private'});
+ }catch(e){
+  res.status(502).json({error:(e.message||'Could not start M-Pesa payment.')+' The hold remains active. Retry the STK Push or use the manual fallback below.',bookingRef:reference,id:b.id,packageId:pkg?.id||null,amount,creditAvailable:0,creditApplied:Number(pkg?.credit_applied||b.credit_applied||0),paymentPending:true,type:pkg?'package':'private'});
+ }
 });
 app.post("/api/my/bookings/:id/decline-provisional",requireAuth,(req,res)=>{
  const b=db.prepare("SELECT * FROM bookings WHERE id=? AND user_id=? AND status='provisional'").get(req.params.id,req.user.id);
@@ -1847,7 +1899,7 @@ function rescheduleBookingInternal(req,res,actor){
   if(serviceUnavailable(b.location_type,startAt,bufferEnd))return res.status(409).json({error:b.location_type==='home'?"Home visits are unavailable then.":"Amy's arena is unavailable then."});
   const unifiedBlock=scheduleBlockConflict(b.location_type,startAt,bufferEnd);if(unifiedBlock)return res.status(409).json({error:unifiedBlock.public_message||unifiedBlock.reason||"That new time is blocked."});
   if(!locationPlanAllows(b.location_type,startAt,endAt))return res.status(409).json({error:b.location_type==='home'?"Amy is not offering home appointments at that time.":"Amy is not offering arena appointments at that time."});
-  const others=db.prepare("SELECT * FROM bookings WHERE id!=? AND status!='cancelled' AND payment_status IN ('paid','demo_paid','pending')").all(b.id);
+  const others=db.prepare("SELECT * FROM bookings WHERE id!=? AND status!='cancelled' AND payment_status IN ('paid','demo_paid','credit_paid','pending')").all(b.id);
   if(others.some(o=>overlaps(startAt,bufferEnd,o.start_at,o.buffer_end_at)))return res.status(409).json({error:"That new time conflicts with another booking."});
   if(db.prepare("SELECT 1 FROM availability_blocks WHERE start_at < ? AND end_at > ?").get(bufferEnd,startAt))return res.status(409).json({error:"That new time is blocked."});
   const classRows=db.prepare("SELECT s.session_date,s.start_time,s.end_time FROM class_sessions s JOIN classes c ON c.id=s.class_id WHERE c.status='open'").all();
@@ -1888,38 +1940,158 @@ app.put("/api/trainer/pets/:id/private-notes",requireTrainer,(req,res)=>{
 
 
 // v21.8 payment recovery, reschedule requests, reports and notifications
+
+app.post("/api/my/payments/apply-credit",requireAuth,(req,res)=>{
+ const target=paymentTargetForClient(req.user.id,req.body||{});
+ if(!target)return res.status(404).json({error:"Payment record not found."});
+ if(target.type==="package"&&target.row.payment_status!=="pending")return res.status(409).json({error:"This package is no longer awaiting payment."});
+ if(target.type==="private"&&(target.row.payment_status!=="pending"||["cancelled","expired"].includes(target.row.status)))return res.status(409).json({error:"This booking is no longer awaiting payment."});
+ if(target.type==="class"&&(target.row.payment_status!=="pending"||target.row.enrolment_status!=="active"))return res.status(409).json({error:"This class place is no longer awaiting payment."});
+ const available=clientCreditBalance(req.user.id),remaining=paymentTargetRemaining(target);
+ if(available<=0)return res.status(409).json({error:"There is no client credit available to apply."});
+ if(remaining<=0)return res.status(409).json({error:"This payment is already covered."});
+ const applied=Math.min(available,remaining),newUsed=Number(target.used||0)+applied,newRemaining=remaining-applied;
+ const tx=db.transaction(()=>{
+   db.prepare("INSERT INTO client_credit_ledger(user_id,amount_delta,source_type,source_id,note) VALUES(?,?,?,?,?)")
+     .run(req.user.id,-applied,"payment",target.row.id,`Credit applied to ${target.type} payment.`);
+   if(target.type==="package"){
+     if(newRemaining===0){
+       db.prepare("UPDATE booking_packages SET credit_applied=?,payment_status='credit_paid',status='confirmed',hold_expires_at=NULL,payment_received_at=CURRENT_TIMESTAMP WHERE id=?").run(newUsed,target.row.id);
+       db.prepare("UPDATE bookings SET payment_status='credit_paid',status='confirmed',hold_expires_at=NULL WHERE package_id=?").run(target.row.id);
+     }else db.prepare("UPDATE booking_packages SET credit_applied=? WHERE id=?").run(newUsed,target.row.id);
+   }else if(target.type==="class"){
+     if(newRemaining===0)db.prepare("UPDATE class_enrolments SET credit_applied=?,payment_status='credit_paid',payment_received_at=CURRENT_TIMESTAMP WHERE id=?").run(newUsed,target.row.id);
+     else db.prepare("UPDATE class_enrolments SET credit_applied=? WHERE id=?").run(newUsed,target.row.id);
+   }else{
+     if(newRemaining===0)db.prepare("UPDATE bookings SET credit_applied=?,payment_status='credit_paid',status='confirmed',hold_expires_at=NULL,payment_received_at=CURRENT_TIMESTAMP WHERE id=?").run(newUsed,target.row.id);
+     else db.prepare("UPDATE bookings SET credit_applied=? WHERE id=?").run(newUsed,target.row.id);
+   }
+ });
+ tx();
+ const balance=clientCreditBalance(req.user.id);
+ logActivity({userId:req.user.id,petId:target.row.pet_id||null,actorUserId:req.user.id,actorRole:"client",action:"client_credit_used",details:`KES ${applied} client credit applied to ${target.type} payment. Remaining credit KES ${balance}.`});
+ res.json({ok:true,applied,remaining:newRemaining,creditBalance:balance,settled:newRemaining===0});
+});
+
 app.post("/api/my/bookings/:id/resume-payment",requireAuth,async(req,res)=>{
- expireTimedHolds();const b=db.prepare("SELECT * FROM bookings WHERE id=? AND user_id=?").get(req.params.id,req.user.id);if(!b||b.payment_status!=='pending'||!['pending_payment','provisional','confirmed'].includes(b.status))return res.status(404).json({error:"This pending booking cannot be resumed."});if(expiryIsPast(b.hold_expires_at))return res.status(409).json({error:"The hold has expired. Please book again."});const pkg=b.package_id?db.prepare("SELECT * FROM booking_packages WHERE id=? AND user_id=?").get(b.package_id,req.user.id):null;const amount=pkg?pkg.package_price:b.price,reference=pkg?`PKG-${pkg.id}`:b.booking_ref;try{const m=await initiateMpesa(req.user.mpesa_phone||req.user.phone,amount,reference);if(pkg)db.prepare("UPDATE booking_packages SET mpesa_request_id=? WHERE id=?").run(m.checkoutRequestId,pkg.id);else db.prepare("UPDATE bookings SET mpesa_request_id=? WHERE id=?").run(m.checkoutRequestId,b.id);res.json({bookingRef:reference,id:b.id,packageId:pkg?.id||null,amount,holdExpiresAt:b.hold_expires_at,firstAppointment:isFirstAppointmentForDog(b.pet_id),mpesaDemo:m.demo,mpesaMessage:m.demo?"Demo payment mode: press Confirm payment in the trial.":"Check your M-Pesa phone for the prompt.",type:pkg?'package':'private'});}catch(e){res.status(502).json({error:(e.message||'Could not start M-Pesa payment.')+' You can use M-Pesa Send Money instead.',bookingRef:reference,id:b.id,amount,paymentPending:true})}
+ expireTimedHolds();
+ const b=db.prepare("SELECT * FROM bookings WHERE id=? AND user_id=?").get(req.params.id,req.user.id);
+ if(!b||b.payment_status!=='pending'||!['pending_payment','provisional','confirmed'].includes(b.status))return res.status(404).json({error:"This pending booking cannot be resumed."});
+ if(expiryIsPast(b.hold_expires_at))return res.status(409).json({error:"The hold has expired. Please book again."});
+ const pkg=b.package_id?db.prepare("SELECT * FROM booking_packages WHERE id=? AND user_id=?").get(b.package_id,req.user.id):null;
+ const total=pkg?Number(pkg.package_price||0):Number(b.price||0),used=pkg?Number(pkg.credit_applied||0):Number(b.credit_applied||0),amount=Math.max(0,total-used),reference=pkg?`PKG-${pkg.id}`:b.booking_ref;
+ if(amount<=0)return res.json({bookingRef:reference,id:b.id,packageId:pkg?.id||null,amount:0,creditAvailable:clientCreditBalance(req.user.id),settled:true,type:pkg?'package':'private'});
+ try{
+  const m=await initiateMpesa(req.user.mpesa_phone||req.user.phone,amount,reference);
+  if(pkg)db.prepare("UPDATE booking_packages SET mpesa_request_id=? WHERE id=?").run(m.checkoutRequestId,pkg.id);
+  else db.prepare("UPDATE bookings SET mpesa_request_id=? WHERE id=?").run(m.checkoutRequestId,b.id);
+  res.json({bookingRef:reference,id:b.id,packageId:pkg?.id||null,amount,holdExpiresAt:b.hold_expires_at,firstAppointment:isFirstAppointmentForDog(b.pet_id),creditAvailable:clientCreditBalance(req.user.id),creditApplied:used,mpesaDemo:m.demo,mpesaMessage:m.demo?"Demo payment mode: complete the trial payment.":"M-Pesa prompt sent. Approve it on your phone.",type:pkg?'package':'private'});
+ }catch(e){
+  res.status(502).json({error:(e.message||'Could not start M-Pesa payment.')+' Your booking remains held. You can retry the STK Push or use the manual fallback below.',bookingRef:reference,id:b.id,packageId:pkg?.id||null,amount,creditAvailable:clientCreditBalance(req.user.id),creditApplied:used,paymentPending:true,type:pkg?'package':'private'});
+ }
 });
 app.post("/api/my/bookings/:id/cancel-pending",requireAuth,(req,res)=>{const b=db.prepare("SELECT * FROM bookings WHERE id=? AND user_id=?").get(req.params.id,req.user.id);if(!b||b.payment_status!=='pending')return res.status(404).json({error:"Pending booking not found."});if(b.package_id){db.prepare("UPDATE booking_packages SET status='cancelled',payment_status='cancelled' WHERE id=?").run(b.package_id);db.prepare("UPDATE bookings SET status='cancelled',payment_status='cancelled' WHERE package_id=?").run(b.package_id)}else db.prepare("UPDATE bookings SET status='cancelled',payment_status='cancelled' WHERE id=?").run(b.id);logActivity({userId:req.user.id,petId:b.pet_id,actorUserId:req.user.id,actorRole:'client',action:'pending_booking_cancelled',details:`Unpaid booking ${b.booking_ref} cancelled; slot released.`});res.json({ok:true})});
 app.post("/api/my/bookings/:id/manual-payment",requireAuth,(req,res)=>{
  const b=db.prepare("SELECT * FROM bookings WHERE id=? AND user_id=?").get(req.params.id,req.user.id);
  if(!b||b.payment_status!=='pending')return res.status(404).json({error:"Pending booking not found."});
- const code=String(req.body.confirmationCode||'').trim().toUpperCase(),amount=Number(req.body.amount);
- if(code.length<6||!Number.isFinite(amount)||amount<=0)return res.status(400).json({error:"Enter the M-Pesa confirmation code and amount sent."});
+ const code=normalizeMpesaReference(req.body.confirmationCode),amount=Number(req.body.amount);
+ if(!/^[A-Z0-9]{10}$/.test(code))return res.status(400).json({error:"Enter the full 10-character M-Pesa confirmation reference."});
+ if(!Number.isFinite(amount)||amount<=0)return res.status(400).json({error:"Enter the amount sent in KES."});
  const pkg=b.package_id?db.prepare("SELECT * FROM booking_packages WHERE id=? AND user_id=?").get(b.package_id,req.user.id):null;
- const due=pkg?Number(pkg.package_price||0):Number(b.price||0);
+ const total=pkg?Number(pkg.package_price||0):Number(b.price||0),used=pkg?Number(pkg.credit_applied||0):Number(b.credit_applied||0),due=Math.max(0,total-used);
  if(pkg?.manual_payment_status==='submitted'||b.manual_payment_status==='submitted')return res.status(409).json({error:"This payment confirmation has already been submitted to Amy."});
- if(amount>due&&due>0)return res.status(400).json({error:`Amount sent cannot be more than the amount due (KES ${due.toLocaleString()}).`});
+ if(amount!==due)return res.status(400).json({error:`The manual payment should be KES ${due.toLocaleString()}. Please check the amount before submitting the reference.`});
  db.prepare("UPDATE bookings SET manual_payment_code=?,manual_payment_amount=?,manual_payment_status='submitted' WHERE id=?").run(code,amount,b.id);
  if(pkg)db.prepare("UPDATE booking_packages SET manual_payment_code=?,manual_payment_amount=?,manual_payment_status='submitted' WHERE id=?").run(code,amount,pkg.id);
  notifyTrainer({userId:req.user.id,petId:b.pet_id,bookingId:b.id,kind:'manual_payment',message:`Manual M-Pesa payment submitted for ${pkg?`package ${pkg.name}`:b.booking_ref}: ${code}, KES ${amount}.`});
- logActivity({userId:req.user.id,petId:b.pet_id,actorUserId:req.user.id,actorRole:'client',action:'manual_payment_submitted',details:`Manual M-Pesa confirmation submitted for ${pkg?`package ${pkg.name}`:b.booking_ref}.`});
- res.json({ok:true,packageId:pkg?.id||null,amount});
+ logActivity({userId:req.user.id,petId:b.pet_id,actorUserId:req.user.id,actorRole:'client',action:'manual_payment_submitted',details:`Manual M-Pesa reference ${code} submitted for ${pkg?`package ${pkg.name}`:b.booking_ref}.`});
+ res.json({ok:true,packageId:pkg?.id||null,amount,mpesaRef:code});
 });
-app.post("/api/trainer/bookings/:id/manual-payment",requireTrainer,(req,res)=>{const b=db.prepare("SELECT * FROM bookings WHERE id=?").get(req.params.id);if(!b||b.manual_payment_status!=='submitted')return res.status(404).json({error:"Manual payment submission not found."});const approve=!!req.body.approve;if(approve){db.prepare("UPDATE bookings SET payment_status='paid',status='confirmed',manual_payment_status='verified',hold_expires_at=NULL WHERE id=?").run(b.id);if(b.package_id){db.prepare("UPDATE booking_packages SET payment_status='paid',status='confirmed',manual_payment_status='verified',hold_expires_at=NULL WHERE id=?").run(b.package_id);db.prepare("UPDATE bookings SET payment_status='paid',status='confirmed',hold_expires_at=NULL WHERE package_id=?").run(b.package_id)}}else{db.prepare("UPDATE bookings SET manual_payment_status=NULL,manual_payment_code=NULL,manual_payment_amount=NULL WHERE id=?").run(b.id);if(b.package_id){db.prepare("UPDATE booking_packages SET manual_payment_status=NULL,manual_payment_code=NULL,manual_payment_amount=NULL WHERE id=?").run(b.package_id);db.prepare("UPDATE bookings SET manual_payment_status=NULL,manual_payment_code=NULL,manual_payment_amount=NULL WHERE package_id=?").run(b.package_id)}}db.prepare("UPDATE trainer_notifications SET resolved=1 WHERE booking_id=? AND kind='manual_payment'").run(b.id);logActivity({userId:b.user_id,petId:b.pet_id,actorUserId:req.user.id,actorRole:'trainer',action:approve?'manual_payment_verified':'manual_payment_rejected',details:approve?`Manual payment verified for ${b.booking_ref}.`:`Manual payment rejected for ${b.booking_ref}.`});res.json({ok:true})});
+app.post("/api/trainer/bookings/:id/manual-payment",requireTrainer,(req,res)=>{
+ const b=db.prepare("SELECT * FROM bookings WHERE id=?").get(req.params.id);
+ if(!b||b.manual_payment_status!=='submitted')return res.status(404).json({error:"Manual payment submission not found."});
+ const approve=!!req.body.approve;
+ if(approve){
+  db.prepare("UPDATE bookings SET payment_status='paid',status='confirmed',manual_payment_status='verified',hold_expires_at=NULL,payment_received_at=CURRENT_TIMESTAMP,mpesa_receipt_number=? WHERE id=?").run(b.manual_payment_code,b.id);
+  if(b.package_id){
+   const pkg=db.prepare("SELECT * FROM booking_packages WHERE id=?").get(b.package_id);
+   db.prepare("UPDATE booking_packages SET payment_status='paid',status='confirmed',manual_payment_status='verified',hold_expires_at=NULL,payment_received_at=CURRENT_TIMESTAMP,mpesa_receipt_number=? WHERE id=?").run(pkg?.manual_payment_code||b.manual_payment_code,b.package_id);
+   db.prepare("UPDATE bookings SET payment_status='paid',status='confirmed',hold_expires_at=NULL WHERE package_id=?").run(b.package_id);
+  }
+ }else{
+  db.prepare("UPDATE bookings SET manual_payment_status=NULL,manual_payment_code=NULL,manual_payment_amount=NULL WHERE id=?").run(b.id);
+  if(b.package_id){
+   db.prepare("UPDATE booking_packages SET manual_payment_status=NULL,manual_payment_code=NULL,manual_payment_amount=NULL WHERE id=?").run(b.package_id);
+   db.prepare("UPDATE bookings SET manual_payment_status=NULL,manual_payment_code=NULL,manual_payment_amount=NULL WHERE package_id=?").run(b.package_id);
+  }
+ }
+ db.prepare("UPDATE trainer_notifications SET resolved=1 WHERE booking_id=? AND kind='manual_payment'").run(b.id);
+ logActivity({userId:b.user_id,petId:b.pet_id,actorUserId:req.user.id,actorRole:'trainer',action:approve?'manual_payment_verified':'manual_payment_rejected',details:approve?`Manual payment verified for ${b.booking_ref}.`:`Manual payment rejected for ${b.booking_ref}.`});
+ res.json({ok:true});
+});
 
-function createClientRescheduleRequest(req,res){expireTimedHolds();const b=db.prepare("SELECT * FROM bookings WHERE id=? AND user_id=?").get(req.params.id,req.user.id);if(!b||b.status!=='confirmed'||!["paid","demo_paid"].includes(b.payment_status))return res.status(404).json({error:"Confirmed booking not found."});const used=b.package_id?db.prepare("SELECT reschedule_count n FROM booking_packages WHERE id=?").get(b.package_id)?.n:Number(b.reschedule_count||0);if(Number(used)>=3)return res.status(409).json({error:"The three client-requested reschedules have been used. Please contact Amy."});if(db.prepare("SELECT 1 FROM reschedule_requests WHERE booking_id=? AND status='pending'").get(b.id))return res.status(409).json({error:"A reschedule request is already waiting for Amy."});const startAt=String(req.body.startAt||'');if(!privateBookingDateAllowed(startAt))return res.status(409).json({error:"Choose an appointment from tomorrow onwards."});const duration=Math.round((wallClockMs(b.end_at)-wallClockMs(b.start_at))/60000),buffer=b.location_type==='arena'?0:Math.max(30,b.travel_minutes||0),endAt=addMinutes(startAt,duration),bufferEnd=addMinutes(endAt,buffer);if(!withinWorkingHours(startAt,endAt)||recurringBlockConflict(startAt,endAt)||serviceUnavailable(b.location_type,startAt,bufferEnd)||scheduleBlockConflict(b.location_type,startAt,bufferEnd))return res.status(409).json({error:"That requested time is unavailable."});const others=db.prepare("SELECT * FROM bookings WHERE id!=? AND status NOT IN ('cancelled','expired') AND payment_status IN ('paid','demo_paid','pending')").all(b.id);if(others.some(o=>overlaps(startAt,bufferEnd,o.start_at,o.buffer_end_at))||activeRescheduleHoldConflict(startAt,bufferEnd,b.id))return res.status(409).json({error:"That requested time is already held or booked."});const classes=db.prepare("SELECT * FROM class_sessions").all();if(classes.some(x=>overlaps(startAt,bufferEnd,isoDateTime(x.session_date,x.start_time),isoDateTime(x.session_date,x.end_time))))return res.status(409).json({error:"That requested time overlaps a class."});const hold=addHoursIso(24);const id=db.prepare("INSERT INTO reschedule_requests(booking_id,user_id,old_start_at,proposed_start_at,proposed_end_at,proposed_buffer_end_at,hold_expires_at,client_note) VALUES(?,?,?,?,?,?,?,?)").run(b.id,req.user.id,b.start_at,startAt,endAt,bufferEnd,hold,String(req.body.note||'').trim()||null).lastInsertRowid;notifyTrainer({userId:req.user.id,petId:b.pet_id,bookingId:b.id,kind:'reschedule_request',message:`Client requested a reschedule for ${b.booking_ref}: ${b.start_at} → ${startAt}.`});logActivity({userId:req.user.id,petId:b.pet_id,actorUserId:req.user.id,actorRole:'client',action:'reschedule_requested',details:`${b.start_at} → ${startAt}; held for Amy until ${hold}.`});res.json({ok:true,id,holdExpiresAt:hold})}
+
+function createClientRescheduleRequest(req,res){expireTimedHolds();const b=db.prepare("SELECT * FROM bookings WHERE id=? AND user_id=?").get(req.params.id,req.user.id);if(!b||b.status!=='confirmed'||!["paid","demo_paid","credit_paid"].includes(b.payment_status))return res.status(404).json({error:"Confirmed booking not found."});const used=b.package_id?db.prepare("SELECT reschedule_count n FROM booking_packages WHERE id=?").get(b.package_id)?.n:Number(b.reschedule_count||0);if(Number(used)>=3)return res.status(409).json({error:"The three client-requested reschedules have been used. Please contact Amy."});if(db.prepare("SELECT 1 FROM reschedule_requests WHERE booking_id=? AND status='pending'").get(b.id))return res.status(409).json({error:"A reschedule request is already waiting for Amy."});const startAt=String(req.body.startAt||'');if(!privateBookingDateAllowed(startAt))return res.status(409).json({error:"Choose an appointment from tomorrow onwards."});const duration=Math.round((wallClockMs(b.end_at)-wallClockMs(b.start_at))/60000),buffer=b.location_type==='arena'?0:Math.max(30,b.travel_minutes||0),endAt=addMinutes(startAt,duration),bufferEnd=addMinutes(endAt,buffer);if(!withinWorkingHours(startAt,endAt)||recurringBlockConflict(startAt,endAt)||serviceUnavailable(b.location_type,startAt,bufferEnd)||scheduleBlockConflict(b.location_type,startAt,bufferEnd))return res.status(409).json({error:"That requested time is unavailable."});const others=db.prepare("SELECT * FROM bookings WHERE id!=? AND status NOT IN ('cancelled','expired') AND payment_status IN ('paid','demo_paid','credit_paid','pending')").all(b.id);if(others.some(o=>overlaps(startAt,bufferEnd,o.start_at,o.buffer_end_at))||activeRescheduleHoldConflict(startAt,bufferEnd,b.id))return res.status(409).json({error:"That requested time is already held or booked."});const classes=db.prepare("SELECT * FROM class_sessions").all();if(classes.some(x=>overlaps(startAt,bufferEnd,isoDateTime(x.session_date,x.start_time),isoDateTime(x.session_date,x.end_time))))return res.status(409).json({error:"That requested time overlaps a class."});const hold=addHoursIso(24);const id=db.prepare("INSERT INTO reschedule_requests(booking_id,user_id,old_start_at,proposed_start_at,proposed_end_at,proposed_buffer_end_at,hold_expires_at,client_note) VALUES(?,?,?,?,?,?,?,?)").run(b.id,req.user.id,b.start_at,startAt,endAt,bufferEnd,hold,String(req.body.note||'').trim()||null).lastInsertRowid;notifyTrainer({userId:req.user.id,petId:b.pet_id,bookingId:b.id,kind:'reschedule_request',message:`Client requested a reschedule for ${b.booking_ref}: ${b.start_at} → ${startAt}.`});logActivity({userId:req.user.id,petId:b.pet_id,actorUserId:req.user.id,actorRole:'client',action:'reschedule_requested',details:`${b.start_at} → ${startAt}; held for Amy until ${hold}.`});res.json({ok:true,id,holdExpiresAt:hold})}
 app.post("/api/trainer/reschedule-requests/:id/decision",requireTrainer,(req,res)=>{expireTimedHolds();const r=db.prepare("SELECT rr.*,b.package_id,b.pet_id FROM reschedule_requests rr JOIN bookings b ON b.id=rr.booking_id WHERE rr.id=?").get(req.params.id);if(!r||r.status!=='pending')return res.status(404).json({error:"Reschedule request not found or expired."});const decision=String(req.body.decision||'');if(!['approve','decline'].includes(decision))return res.status(400).json({error:"Choose approve or decline."});const note=String(req.body.note||'').trim();if(decision==='approve'){db.prepare("UPDATE bookings SET start_at=?,end_at=?,buffer_end_at=?,reschedule_count=reschedule_count+1 WHERE id=?").run(r.proposed_start_at,r.proposed_end_at,r.proposed_buffer_end_at,r.booking_id);if(r.package_id)db.prepare("UPDATE booking_packages SET reschedule_count=reschedule_count+1 WHERE id=?").run(r.package_id);db.prepare("UPDATE reschedule_requests SET status='approved',trainer_note=?,decided_at=CURRENT_TIMESTAMP WHERE id=?").run(note||null,r.id)}else db.prepare("UPDATE reschedule_requests SET status='declined',trainer_note=?,decided_at=CURRENT_TIMESTAMP WHERE id=?").run(note||null,r.id);db.prepare("UPDATE trainer_notifications SET resolved=1 WHERE booking_id=? AND kind='reschedule_request'").run(r.booking_id);logActivity({userId:r.user_id,petId:r.pet_id,actorUserId:req.user.id,actorRole:'trainer',action:decision==='approve'?'reschedule_approved':'reschedule_declined',details:decision==='approve'?`${r.old_start_at} → ${r.proposed_start_at}.`:`Reschedule request declined.${note?' '+note:''}`});res.json({ok:true})});
 app.post("/api/trainer/notifications/:id/resolve",requireTrainer,(req,res)=>{db.prepare("UPDATE trainer_notifications SET resolved=1 WHERE id=?").run(req.params.id);res.json({ok:true})});
 
-app.post("/api/bookings/package/:id/demo-pay",requireAuth,(req,res)=>{const p=db.prepare("SELECT * FROM booking_packages WHERE id=? AND user_id=? AND payment_status='pending'").get(req.params.id,req.user.id);if(!p)return res.status(404).json({error:"Package not found."});db.prepare("UPDATE booking_packages SET payment_status='demo_paid',status='confirmed',hold_expires_at=NULL WHERE id=?").run(p.id);db.prepare("UPDATE bookings SET payment_status='demo_paid',status='confirmed',hold_expires_at=NULL WHERE package_id=?").run(p.id);res.json({ok:true})});
+app.post("/api/bookings/package/:id/demo-pay",requireAuth,(req,res)=>{const p=db.prepare("SELECT * FROM booking_packages WHERE id=? AND user_id=? AND payment_status='pending'").get(req.params.id,req.user.id);if(!p)return res.status(404).json({error:"Package not found."});db.prepare("UPDATE booking_packages SET payment_status='demo_paid',status='confirmed',hold_expires_at=NULL,payment_received_at=CURRENT_TIMESTAMP WHERE id=?").run(p.id);db.prepare("UPDATE bookings SET payment_status='demo_paid',status='confirmed',hold_expires_at=NULL WHERE package_id=?").run(p.id);res.json({ok:true})});
 
 app.get("/api/trainer/reports/:type",requireTrainer,(req,res)=>{
   expireTimedHolds(); const type=String(req.params.type||''),from=String(req.query.from||nairobiDateKey(-30)),to=String(req.query.to||nairobiDateKey(30)); let rows=[],title='Report';
   if(type==='daily'){title='Daily Sheet';rows=db.prepare(`SELECT b.start_at,b.end_at,u.name client,p.name dog,COALESCE(u.whatsapp_phone,u.phone) whatsapp,b.service,CASE WHEN b.location_type='arena' THEN 'Amy''s Arena in Ridgeways' ELSE 'Home visit' END location,b.address,b.payment_status FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE substr(b.start_at,1,10)=? AND b.status NOT IN ('cancelled','expired') ORDER BY b.start_at`).all(from)}
   else if(type==='appointments'){title='Appointments';rows=db.prepare(`SELECT b.start_at,b.end_at,u.name client,p.name dog,b.service,b.location_type,b.address,b.status,b.payment_status,CASE WHEN b.package_id IS NOT NULL THEN COALESCE(bp.package_price,0) ELSE b.price END price,b.booking_ref,bp.name package_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id LEFT JOIN booking_packages bp ON bp.id=b.package_id WHERE substr(b.start_at,1,10) BETWEEN ? AND ? ORDER BY b.start_at`).all(from,to)}
-  else if(type==='payments'){title='Payments';const privateRows=db.prepare(`SELECT b.booking_ref,u.name client,p.name dog,CASE WHEN b.package_id IS NOT NULL THEN 0 ELSE b.price END amount,b.payment_status,b.manual_payment_code,b.manual_payment_amount,b.refund_amount,b.refund_confirmation_code,b.start_at,'Private' source FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE substr(b.start_at,1,10) BETWEEN ? AND ? AND b.package_id IS NULL`).all(from,to);const packageRows=db.prepare(`SELECT ('PACKAGE-' || bp.id) booking_ref,u.name client,p.name dog,COALESCE(bp.package_price,0) amount,bp.payment_status,bp.manual_payment_code,bp.manual_payment_amount,NULL refund_amount,NULL refund_confirmation_code,bp.created_at start_at,'Package' source FROM booking_packages bp JOIN users u ON u.id=bp.user_id LEFT JOIN pets p ON p.id=bp.pet_id WHERE substr(bp.created_at,1,10) BETWEEN ? AND ?`).all(from,to);const classRows=db.prepare(`SELECT e.booking_ref,u.name client,p.name dog,c.price amount,e.payment_status,e.manual_payment_code,e.manual_payment_amount,e.refund_amount,e.refund_confirmation_code,e.created_at start_at,'Class' source FROM class_enrolments e JOIN users u ON u.id=e.user_id LEFT JOIN pets p ON p.id=e.pet_id JOIN classes c ON c.id=e.class_id WHERE substr(e.created_at,1,10) BETWEEN ? AND ?`).all(from,to);rows=[...privateRows,...packageRows,...classRows].sort((x,y)=>String(x.start_at).localeCompare(String(y.start_at)))}
+  else if(type==='payments'){
+    title='Payments';
+    const privateRows=db.prepare(`
+      SELECT COALESCE(b.payment_received_at,b.created_at) received_at,
+             u.name client,
+             CASE WHEN b.payment_status='credit_paid' THEN 0
+                  WHEN b.manual_payment_status='verified' AND b.manual_payment_amount IS NOT NULL THEN b.manual_payment_amount
+                  ELSE MAX(COALESCE(b.price,0)-COALESCE(b.credit_applied,0),0) END amount,
+             COALESCE(b.mpesa_receipt_number,b.manual_payment_code,'') mpesa_ref,
+             b.payment_status status,
+             TRIM(
+               CASE WHEN COALESCE(b.refund_amount,0)>0 THEN 'Refund KES '||b.refund_amount||' ' ELSE '' END ||
+               CASE WHEN COALESCE(b.credit_amount,0)>0 THEN 'Credit granted KES '||b.credit_amount||' ' ELSE '' END ||
+               CASE WHEN COALESCE(b.credit_applied,0)>0 THEN 'Credit applied KES '||b.credit_applied ELSE '' END
+             ) refund_credit,
+             'Private' source,p.name dog,b.booking_ref
+      FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id
+      WHERE b.package_id IS NULL AND b.payment_status NOT IN ('pending','cancelled','failed')
+        AND substr(COALESCE(b.payment_received_at,b.created_at),1,10) BETWEEN ? AND ?`).all(from,to);
+    const packageRows=db.prepare(`
+      SELECT COALESCE(bp.payment_received_at,bp.created_at) received_at,
+             u.name client,
+             CASE WHEN bp.payment_status='credit_paid' THEN 0
+                  WHEN bp.manual_payment_status='verified' AND bp.manual_payment_amount IS NOT NULL THEN bp.manual_payment_amount
+                  ELSE MAX(COALESCE(bp.package_price,0)-COALESCE(bp.credit_applied,0),0) END amount,
+             COALESCE(bp.mpesa_receipt_number,bp.manual_payment_code,'') mpesa_ref,
+             bp.payment_status status,
+             CASE WHEN COALESCE(bp.credit_applied,0)>0 THEN 'Credit applied KES '||bp.credit_applied ELSE '' END refund_credit,
+             'Package' source,p.name dog,('PACKAGE-'||bp.id) booking_ref
+      FROM booking_packages bp JOIN users u ON u.id=bp.user_id LEFT JOIN pets p ON p.id=bp.pet_id
+      WHERE bp.payment_status NOT IN ('pending','cancelled','failed')
+        AND substr(COALESCE(bp.payment_received_at,bp.created_at),1,10) BETWEEN ? AND ?`).all(from,to);
+    const classRows=db.prepare(`
+      SELECT COALESCE(e.payment_received_at,e.created_at) received_at,
+             u.name client,
+             CASE WHEN e.payment_status='credit_paid' THEN 0
+                  WHEN e.manual_payment_status='verified' AND e.manual_payment_amount IS NOT NULL THEN e.manual_payment_amount
+                  ELSE MAX(COALESCE(c.price,0)-COALESCE(e.credit_applied,0),0) END amount,
+             COALESCE(e.mpesa_receipt_number,e.manual_payment_code,'') mpesa_ref,
+             e.payment_status status,
+             TRIM(
+               CASE WHEN COALESCE(e.refund_amount,0)>0 THEN 'Refund KES '||e.refund_amount||' ' ELSE '' END ||
+               CASE WHEN COALESCE(e.credit_amount,0)>0 THEN 'Credit granted KES '||e.credit_amount||' ' ELSE '' END ||
+               CASE WHEN COALESCE(e.credit_applied,0)>0 THEN 'Credit applied KES '||e.credit_applied ELSE '' END
+             ) refund_credit,
+             'Class' source,p.name dog,e.booking_ref
+      FROM class_enrolments e JOIN users u ON u.id=e.user_id LEFT JOIN pets p ON p.id=e.pet_id JOIN classes c ON c.id=e.class_id
+      WHERE e.payment_status NOT IN ('pending','cancelled','failed')
+        AND substr(COALESCE(e.payment_received_at,e.created_at),1,10) BETWEEN ? AND ?`).all(from,to);
+    rows=[...privateRows,...packageRows,...classRows].sort((x,y)=>String(x.received_at).localeCompare(String(y.received_at)));
+  }
   else if(type==='clients'){title='Clients';rows=db.prepare(`SELECT u.id,u.name,u.email,COALESCE(u.whatsapp_phone,u.phone) whatsapp,COALESCE(u.mpesa_phone,u.phone) mpesa,u.kra_pin,u.newsletter_opt_in,u.created_at,u.last_login_at,u.status_override,GROUP_CONCAT(CASE WHEN p.archived=0 THEN p.name END, ', ') dogs FROM users u LEFT JOIN pets p ON p.user_id=u.id WHERE u.role='client' GROUP BY u.id ORDER BY u.name`).all().map(u=>({...u,status:calculatedClientStatus(u)}))}
   else if(type==='vaccinations'){title='Vaccinations';rows=db.prepare(`SELECT u.name client,p.name dog,p.vaccination_status,p.vaccination_verified_at,(SELECT COUNT(*) FROM pet_files f WHERE f.pet_id=p.id AND f.kind='vaccination') files FROM pets p JOIN users u ON u.id=p.user_id WHERE p.archived=0 ORDER BY u.name,p.name`).all()}
   else if(type==='newsletter'){title='The Canine Grapevine';rows=db.prepare(`SELECT name,email,COALESCE(whatsapp_phone,phone) whatsapp,last_login_at FROM users WHERE role='client' AND newsletter_opt_in=1 ORDER BY name`).all()}
@@ -1928,19 +2100,22 @@ app.get("/api/trainer/reports/:type",requireTrainer,(req,res)=>{
 
 // M-Pesa callback
 app.post("/api/mpesa/callback",(req,res)=>{
-  // Daraja sends CheckoutRequestID and ResultCode inside Body.stkCallback.
-  // For production, validate the callback and correlate the CheckoutRequestID
-  // against the stored booking/enrolment before marking paid.
-  const cb=req.body?.Body?.stkCallback;
-  if(cb?.CheckoutRequestID) {
-    const status=Number(cb.ResultCode)===0 ? "paid" : "failed";
-    const bk=db.prepare("SELECT * FROM bookings WHERE mpesa_request_id=?").get(cb.CheckoutRequestID);
-    db.prepare("UPDATE bookings SET payment_status=?,status=CASE WHEN ?='paid' THEN 'confirmed' ELSE status END,hold_expires_at=CASE WHEN ?='paid' THEN NULL ELSE hold_expires_at END WHERE mpesa_request_id=?").run(status,status,status,cb.CheckoutRequestID);
-    const pkg=db.prepare("SELECT * FROM booking_packages WHERE mpesa_request_id=?").get(cb.CheckoutRequestID);if(pkg){db.prepare("UPDATE booking_packages SET payment_status=?,status=CASE WHEN ?='paid' THEN 'confirmed' ELSE status END,hold_expires_at=CASE WHEN ?='paid' THEN NULL ELSE hold_expires_at END WHERE id=?").run(status,status,status,pkg.id);db.prepare("UPDATE bookings SET payment_status=?,status=CASE WHEN ?='paid' THEN 'confirmed' ELSE status END,hold_expires_at=CASE WHEN ?='paid' THEN NULL ELSE hold_expires_at END WHERE package_id=?").run(status,status,status,pkg.id)}
-    db.prepare("UPDATE class_enrolments SET payment_status=? WHERE booking_ref IN (SELECT booking_ref FROM class_enrolments WHERE booking_ref=?)").run(status,cb.CheckoutRequestID);
+ const cb=req.body?.Body?.stkCallback;
+ if(cb?.CheckoutRequestID){
+  const status=Number(cb.ResultCode)===0?"paid":"failed";
+  const items=Array.isArray(cb.CallbackMetadata?.Item)?cb.CallbackMetadata.Item:[];
+  const receipt=normalizeMpesaReference(items.find(x=>x?.Name==="MpesaReceiptNumber")?.Value||"")||null;
+  const bk=db.prepare("SELECT * FROM bookings WHERE mpesa_request_id=?").get(cb.CheckoutRequestID);
+  if(bk)db.prepare(`UPDATE bookings SET payment_status=?,status=CASE WHEN ?='paid' THEN 'confirmed' ELSE status END,hold_expires_at=CASE WHEN ?='paid' THEN NULL ELSE hold_expires_at END,payment_received_at=CASE WHEN ?='paid' THEN CURRENT_TIMESTAMP ELSE payment_received_at END,mpesa_receipt_number=CASE WHEN ?='paid' THEN ? ELSE mpesa_receipt_number END WHERE id=?`).run(status,status,status,status,status,receipt,bk.id);
+  const pkg=db.prepare("SELECT * FROM booking_packages WHERE mpesa_request_id=?").get(cb.CheckoutRequestID);
+  if(pkg){
+   db.prepare(`UPDATE booking_packages SET payment_status=?,status=CASE WHEN ?='paid' THEN 'confirmed' ELSE status END,hold_expires_at=CASE WHEN ?='paid' THEN NULL ELSE hold_expires_at END,payment_received_at=CASE WHEN ?='paid' THEN CURRENT_TIMESTAMP ELSE payment_received_at END,mpesa_receipt_number=CASE WHEN ?='paid' THEN ? ELSE mpesa_receipt_number END WHERE id=?`).run(status,status,status,status,status,receipt,pkg.id);
+   db.prepare("UPDATE bookings SET payment_status=?,status=CASE WHEN ?='paid' THEN 'confirmed' ELSE status END,hold_expires_at=CASE WHEN ?='paid' THEN NULL ELSE hold_expires_at END WHERE package_id=?").run(status,status,status,pkg.id);
   }
-  res.json({ResultCode:0,ResultDesc:"Accepted"});
+ }
+ res.json({ResultCode:0,ResultDesc:"Accepted"});
 });
+
 
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {

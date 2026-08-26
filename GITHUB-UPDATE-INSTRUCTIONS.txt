@@ -1,15 +1,27 @@
-v21.9.7
-Replace server.js, package.json, VERSION.txt, GITHUB-UPDATE-INSTRUCTIONS.txt, public/app.js, public/styles.css and public/index.html.
-Do NOT reset the database.
+v21.9.8 PAYMENT / ACCOUNTING CLEANUP
 
-Test:
-1 registration with a new email + accidental double tap
-2 reschedule opens on booking date; notes visible both sides
-3 manual M-Pesa reject then retry automatic/manual
-4 cancelled paid package session: no Cancel again; refundable value shown
-5 Full refund auto amount; Partial refund
-6 Full credit / Partial credit; balance visible in Amy client record and client Account
-7 5-session custom package = first date + 4 additional date pickers
-8 declined package stays bundled under All bookings
-9 Awaiting action first, Upcoming next, inactive greyed under All
-10 iPhone report date controls
+Replace in GitHub:
+- server.js
+- package.json
+- VERSION.txt
+- GITHUB-UPDATE-INSTRUCTIONS.txt
+- public/app.js
+- public/styles.css
+- public/index.html
+
+Do NOT reset the database. New payment timestamp/reference/credit-applied columns are added automatically.
+
+After Render deploys, Ctrl+F5 and test:
+1. Client private booking with no credit: STK/trial remains the primary payment route.
+2. Manual fallback: enter fewer/more than 10 characters, spaces, lowercase, and a valid 10-character alphanumeric M-Pesa reference.
+3. Amy Needs Attention shows M-Pesa Ref; reject the manual payment; client should only see Resume payment and Cancel booking, not a separate Send Money button.
+4. Resume payment returns to the normal STK-first screen.
+5. Client with credit less than charge: Apply credit, verify remaining amount proceeds to M-Pesa and unused credit becomes zero.
+6. Client with credit equal to charge: Apply credit completes booking with no M-Pesa.
+7. Client with credit greater than charge: Apply credit completes booking and leaves the excess balance visible in Bookings/Account.
+8. Successful trial payment: only Back home is shown; it opens Client Portal > Bookings.
+9. Confirm & Pay is centered on phone/tablet/desktop.
+10. Payments report: verify order/columns and that new payments sort by received time.
+11. iPhone private-booking date field and report date fields stay inside their containers.
+
+Known future item: class manual-payment recovery remains separate.

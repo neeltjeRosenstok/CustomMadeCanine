@@ -866,3 +866,115 @@ b,strong{font-weight:500}
 .booking-section-title{margin:14px 0 4px;color:var(--navy)}.refund-value{display:flex;align-items:center;padding:8px 10px;border-radius:10px;background:rgba(37,33,94,.07)}
 .credit-balance-card{display:grid;gap:3px;padding:12px 14px;margin:0 0 16px;border:1px solid rgba(37,33,94,.18);border-radius:14px;background:rgba(227,220,200,.25)}.credit-balance-card strong{font-size:1.25rem}
 .custom-package-dates{display:grid;gap:8px;margin:12px 0}.custom-package-dates input[readonly]{opacity:.72}#authSubmitBtn:disabled{opacity:.65;cursor:wait}
+
+
+/* v21.9.8 payment/accounting cleanup */
+.confirm-pay-actions{
+  justify-content:center!important;
+  text-align:center!important;
+}
+.confirm-pay-actions #privateContinueBtn{
+  margin-inline:auto!important;
+}
+.payment-main-action,
+.manual-submit-button{
+  display:block!important;
+  width:min(100%,420px)!important;
+  margin:14px auto!important;
+  text-align:center!important;
+}
+.automatic-payment-box{
+  margin:18px 0;
+  padding:16px;
+  border:1px solid rgba(37,33,94,.16);
+  border-radius:14px;
+  background:rgba(255,255,255,.58);
+}
+.credit-payment-option,
+.client-credit-banner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  flex-wrap:wrap;
+  padding:14px 16px;
+  margin:14px 0;
+  border:1px solid rgba(37,33,94,.2);
+  border-radius:14px;
+  background:rgba(227,220,200,.28);
+}
+.credit-payment-option>div,
+.client-credit-banner{
+  min-width:0;
+}
+.credit-payment-option span,
+.client-credit-banner span,
+.credit-payment-option small,
+.client-credit-banner small{
+  display:block;
+}
+.credit-payment-option strong,
+.client-credit-banner strong{
+  font-size:1.25rem;
+}
+.manual-payment-box{
+  border:1px solid rgba(37,33,94,.16)!important;
+  border-radius:14px!important;
+  padding:16px!important;
+  margin-top:18px!important;
+}
+.manual-payment-steps{
+  padding-left:1.25rem;
+  line-height:1.55;
+}
+.manual-payment-details{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+  padding:11px 13px;
+  margin:12px 0;
+  border-radius:11px;
+  background:rgba(37,33,94,.06);
+}
+.manual-payment-box #manualMpesaCode{
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  font-size:17px;
+}
+.payment-exit-actions,
+.confirmation-actions{
+  justify-content:center!important;
+}
+.account-update{
+  margin:10px 0 14px!important;
+}
+
+/* iPhone/iOS date inputs: prevent native intrinsic width from escaping their container */
+@media(max-width:560px){
+  label,
+  .form-grid>*,
+  .two-col>*,
+  .panel>*{
+    min-width:0;
+  }
+  input[type="date"]{
+    display:block!important;
+    inline-size:100%!important;
+    width:100%!important;
+    min-inline-size:0!important;
+    min-width:0!important;
+    max-inline-size:100%!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+    -webkit-appearance:none;
+    appearance:none;
+    font-size:16px!important;
+    overflow:hidden!important;
+  }
+  #privateDate{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+  }
+}
