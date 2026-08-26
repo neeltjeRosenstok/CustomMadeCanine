@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.6-online-test";
+const APP_VERSION = "21.9.7-online-test";
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -352,6 +352,24 @@ function calculatedClientStatus(u){
  const days=(Date.now()-new Date(String(basis).replace(' ','T')+'Z').getTime())/86400000;
  return days>=365?'archived':days>=90?'dormant':'current';
 }
+function clientCreditBalance(userId){
+ const r=db.prepare("SELECT COALESCE(SUM(amount_delta),0) balance FROM client_credit_ledger WHERE user_id=?").get(userId);
+ return Number(r?.balance||0);
+}
+function packageSessionRefundableAmount(booking){
+ if(!booking?.package_id)return Math.max(0,Number(booking?.price||0));
+ const pkg=db.prepare("SELECT package_price FROM booking_packages WHERE id=?").get(booking.package_id);
+ if(!pkg)return 0;
+ const rows=db.prepare("SELECT id FROM bookings WHERE package_id=? ORDER BY start_at,id").all(booking.package_id);
+ const n=Math.max(1,rows.length),total=Math.max(0,Math.round(Number(pkg.package_price||0)));
+ const base=Math.floor(total/n),remainder=total-(base*n),index=rows.findIndex(x=>Number(x.id)===Number(booking.id));
+ return base+(index>=0&&index<remainder?1:0);
+}
+function addClientCredit(userId,amount,sourceType,sourceId,note){
+ const value=Math.round(Number(amount||0));if(!Number.isFinite(value)||value<=0)throw new Error("Credit amount must be greater than zero.");
+ db.prepare("INSERT INTO client_credit_ledger(user_id,amount_delta,source_type,source_id,note) VALUES(?,?,?,?,?)").run(userId,value,sourceType||null,sourceId||null,note||null);
+ return clientCreditBalance(userId);
+}
 function activeRescheduleHoldConflict(startAt,endAt,excludeBookingId=null){
  expireTimedHolds();
  return db.prepare("SELECT * FROM reschedule_requests WHERE status='pending' AND datetime(hold_expires_at)>datetime('now')").all().find(r=>Number(r.booking_id)!==Number(excludeBookingId||0)&&overlaps(startAt,endAt,r.proposed_start_at,r.proposed_buffer_end_at))||null;
@@ -437,6 +455,8 @@ try { db.exec("ALTER TABLE class_enrolments ADD COLUMN manual_payment_code TEXT"
 try { db.exec("ALTER TABLE class_enrolments ADD COLUMN manual_payment_amount INTEGER"); } catch {}
 try { db.exec("ALTER TABLE class_enrolments ADD COLUMN manual_payment_status TEXT"); } catch {}
 try { db.exec("ALTER TABLE schedule_blocks ADD COLUMN silent_calendar INTEGER NOT NULL DEFAULT 0"); } catch {}
+try { db.exec("ALTER TABLE bookings ADD COLUMN credit_amount INTEGER"); } catch {}
+try { db.exec("ALTER TABLE class_enrolments ADD COLUMN credit_amount INTEGER"); } catch {}
 
 db.exec(`CREATE TABLE IF NOT EXISTS booking_packages (
  id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -457,6 +477,16 @@ db.exec(`CREATE TABLE IF NOT EXISTS booking_packages (
  manual_payment_status TEXT,
  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS client_credit_ledger (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ amount_delta INTEGER NOT NULL,
+ source_type TEXT,
+ source_id INTEGER,
+ note TEXT,
+ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_client_credit_user ON client_credit_ledger(user_id,created_at);
 CREATE TABLE IF NOT EXISTS reschedule_requests (
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -694,19 +724,23 @@ async function initiateMpesa(phone,amount,accountRef) {
 
 // Auth
 app.post("/api/auth/register", (req,res)=>{
-  const {name,email,whatsappPhone,mpesaPhone,password,newsletterOptIn}=req.body;
-  const whats=String(whatsappPhone||"").trim(), mpesa=String(mpesaPhone||"").trim()||whats;
-  if (!name || !email || !whats || !password) return res.status(400).json({error:"Please complete name, WhatsApp number, email and password."});
-  if (password.length < 6) return res.status(400).json({error:"Password must be at least 6 characters."});
-  try {
-    const hash=bcrypt.hashSync(password,12);
-    const id=db.prepare("INSERT INTO users(role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,last_login_at,password_hash) VALUES('client',?,?,?,?,?,?,CURRENT_TIMESTAMP,?)")
-      .run(String(name).trim(),String(email).trim().toLowerCase(),whats,whats,mpesa,newsletterOptIn?1:0,hash).lastInsertRowid;
-    logActivity({userId:Number(id),actorUserId:Number(id),actorRole:"client",action:"account_created",details:`New client account created — ${String(name).trim()}.`});
-    notifyTrainer({userId:Number(id),kind:"new_account",message:`New client account created — ${String(name).trim()}.`});
-    req.session = {userId:id, appVersion:APP_VERSION};
-    res.json({user:currentUser(req)});
-  } catch(e) {res.status(400).json({error:"That email is already registered."});}
+ const {name,email,whatsappPhone,mpesaPhone,password,newsletterOptIn}=req.body;
+ const whats=String(whatsappPhone||"").trim(),mpesa=String(mpesaPhone||"").trim()||whats,cleanEmail=String(email||"").trim().toLowerCase();
+ if(!name||!cleanEmail||!whats||!password)return res.status(400).json({error:"Please complete name, WhatsApp number, email and password."});
+ if(password.length<6)return res.status(400).json({error:"Password must be at least 6 characters."});
+ if(db.prepare("SELECT id FROM users WHERE email=?").get(cleanEmail))return res.status(409).json({error:"That email is already registered. Please sign in instead.",code:"EMAIL_EXISTS"});
+ let id=null;
+ try{
+  const hash=bcrypt.hashSync(password,12);
+  id=db.prepare("INSERT INTO users(role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,last_login_at,password_hash) VALUES('client',?,?,?,?,?,?,CURRENT_TIMESTAMP,?)").run(String(name).trim(),cleanEmail,whats,whats,mpesa,newsletterOptIn?1:0,hash).lastInsertRowid;
+ }catch(e){
+  const nowExists=db.prepare("SELECT id FROM users WHERE email=?").get(cleanEmail);
+  if(nowExists)return res.status(409).json({error:"An account with this email has just been created. Please try signing in.",code:"EMAIL_JUST_CREATED"});
+  console.error("Registration insert failed:",e);return res.status(500).json({error:"Your account could not be created. Please try again."});
+ }
+ try{logActivity({userId:Number(id),actorUserId:Number(id),actorRole:"client",action:"account_created",details:`New client account created — ${String(name).trim()}.`})}catch(e){console.error(e)}
+ try{notifyTrainer({userId:Number(id),kind:"new_account",message:`New client account created — ${String(name).trim()}.`})}catch(e){console.error(e)}
+ req.session={userId:id,appVersion:APP_VERSION};res.json({user:currentUser(req)});
 });
 app.post("/api/auth/login",(req,res)=>{
   const {email,password}=req.body;
@@ -975,7 +1009,7 @@ app.get("/api/my/bookings",requireAuth,(req,res)=>{
   expireTimedHolds();
   const privateBookings=db.prepare(`SELECT b.*,p.name AS pet_name,bp.name package_name,bp.package_price,bp.status package_status
     FROM bookings b LEFT JOIN pets p ON p.id=b.pet_id LEFT JOIN booking_packages bp ON bp.id=b.package_id
-    WHERE b.user_id=? ORDER BY b.start_at`).all(req.user.id).map(b=>({...b,first_appointment:isFirstAppointmentForDog(b.pet_id,b.id)}));
+    WHERE b.user_id=? ORDER BY b.start_at`).all(req.user.id).map(b=>({...b,first_appointment:isFirstAppointmentForDog(b.pet_id,b.id),refundable_amount:packageSessionRefundableAmount(b)}));
   const classBookings=db.prepare(`SELECT e.*,c.title,c.description,c.start_date,c.end_date,c.start_time,c.end_time,p.name AS pet_name
     FROM class_enrolments e JOIN classes c ON c.id=e.class_id LEFT JOIN pets p ON p.id=e.pet_id
     WHERE e.user_id=? ORDER BY c.start_date`).all(req.user.id);
@@ -1071,7 +1105,7 @@ function petDetailsForUser(userId,includeTrainer=false) {
 
 app.get("/api/my/profile",requireAuth,(req,res)=>{
   const user=db.prepare("SELECT id,role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,last_login_at FROM users WHERE id=?").get(req.user.id);
-  res.json({user,pets:petDetailsForUser(req.user.id)});
+  res.json({user,pets:petDetailsForUser(req.user.id),creditBalance:clientCreditBalance(req.user.id),creditHistory:db.prepare("SELECT * FROM client_credit_ledger WHERE user_id=? ORDER BY created_at DESC LIMIT 20").all(req.user.id)});
 });
 app.put("/api/my/profile",requireAuth,(req,res)=>{
   const before=db.prepare("SELECT * FROM users WHERE id=?").get(req.user.id);
@@ -1324,7 +1358,7 @@ app.get("/api/trainer/summary",requireTrainer,(req,res)=>{
     classes:db.prepare("SELECT c.*,(SELECT COUNT(*) FROM class_enrolments e WHERE e.class_id=c.id AND e.enrolment_status='active' AND e.payment_status IN ('pending','paid','demo_paid')) enrolled FROM classes c ORDER BY c.start_date DESC").all(),
     pendingReviews:db.prepare("SELECT r.*,u.name FROM reviews r JOIN users u ON u.id=r.user_id WHERE r.status='pending' ORDER BY r.created_at DESC").all(),
     vaccinationAttention:db.prepare(`SELECT p.id pet_id,p.name pet_name,p.breed,p.vaccination_status,p.vaccination_verified_at,u.id user_id,u.name client_name,(SELECT COUNT(*) FROM pet_files f WHERE f.pet_id=p.id AND f.kind='vaccination') vaccination_count FROM pets p JOIN users u ON u.id=p.user_id WHERE COALESCE(p.archived,0)=0 AND p.vaccination_status IN ('pending','rejected','not_provided') ORDER BY p.name`).all(),
-    cancellationAttention:db.prepare(`SELECT b.id,b.user_id,b.pet_id,b.booking_ref,b.start_at,b.end_at,b.service,b.location_type,b.address,b.payment_status,b.status,b.price,b.refund_amount,b.refund_confirmation_code,u.name client_name,u.email client_email,COALESCE(u.whatsapp_phone,u.phone) client_phone,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE b.payment_status='refund_pending' ORDER BY b.start_at DESC`).all(),
+    cancellationAttention:db.prepare(`SELECT b.id,b.user_id,b.pet_id,b.booking_ref,b.start_at,b.end_at,b.service,b.location_type,b.address,b.payment_status,b.status,b.price,b.package_id,b.refund_amount,b.refund_confirmation_code,b.credit_amount,u.name client_name,u.email client_email,COALESCE(u.whatsapp_phone,u.phone) client_phone,p.name pet_name,bp.name package_name,bp.package_price FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id LEFT JOIN booking_packages bp ON bp.id=b.package_id WHERE b.payment_status='refund_pending' ORDER BY b.start_at DESC`).all().map(b=>({...b,refundable_amount:packageSessionRefundableAmount(b)})),
     classRefundAttention:db.prepare(`SELECT e.id,e.class_id,e.booking_ref,e.payment_status,c.title,c.price,u.name client_name,p.name pet_name FROM class_enrolments e JOIN classes c ON c.id=e.class_id JOIN users u ON u.id=e.user_id LEFT JOIN pets p ON p.id=e.pet_id WHERE e.enrolment_status IN ('rejected','cancelled_by_client') AND e.payment_status='refund_pending' ORDER BY e.rejected_at DESC`).all(),
     rescheduleAttention:db.prepare(`SELECT rr.*,b.booking_ref,b.service,b.location_type,u.name client_name,p.name pet_name FROM reschedule_requests rr JOIN bookings b ON b.id=rr.booking_id JOIN users u ON u.id=rr.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE rr.status='pending' AND datetime(rr.hold_expires_at)>datetime('now') ORDER BY rr.created_at`).all(),
     manualPaymentAttention:db.prepare(`SELECT b.id,b.booking_ref,COALESCE(NULLIF(b.price,0),bp.package_price,0) price,b.manual_payment_code,b.manual_payment_amount,u.name client_name,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id LEFT JOIN booking_packages bp ON bp.id=b.package_id WHERE b.manual_payment_status='submitted' ORDER BY b.created_at`).all(),
@@ -1789,27 +1823,16 @@ app.get("/api/trainer/notes/:userId",requireTrainer,(req,res)=>res.json(db.prepa
 app.post("/api/trainer/bookings/:id/reschedule",requireTrainer,(req,res)=>rescheduleBookingInternal(req,res,"trainer"));
 app.post("/api/trainer/bookings/:id/cancel",requireTrainer,(req,res)=>cancelBookingInternal(req,res,"trainer"));
 app.post("/api/trainer/bookings/:id/refund",requireTrainer,(req,res)=>{
-  const decision=String(req.body.decision||"");
-  if(!["full","partial","none"].includes(decision)) return res.status(400).json({error:"Choose full, partial or no refund."});
-  const b=db.prepare("SELECT * FROM bookings WHERE id=?").get(req.params.id);
-  if(!b) return res.status(404).json({error:"Booking not found."});
-
-  let amount=null,code=null,status="no_refund";
-  if(decision!=="none"){
-    amount=Number(req.body.amount);
-    code=String(req.body.confirmationCode||"").trim();
-    if(!Number.isFinite(amount)||amount<=0) return res.status(400).json({error:"Enter the refund amount in KES."});
-    if(amount>Number(b.price||0)) return res.status(400).json({error:"Refund amount cannot exceed the amount paid."});
-    if(!code) return res.status(400).json({error:"Enter the M-Pesa refund/transaction confirmation code."});
-    if(decision==="full" && amount!==Number(b.price||0)) return res.status(400).json({error:`A full refund must equal KES ${Number(b.price||0).toLocaleString()}.`});
-    status=decision==="full"?"refunded":"refund_partial";
-  }
-  db.prepare("UPDATE bookings SET payment_status=?,refund_amount=?,refund_confirmation_code=?,refund_recorded_at=CURRENT_TIMESTAMP WHERE id=?")
-    .run(status,amount,code,b.id);
-  const detail=decision==="none"?"No refund approved.":`${decision==="full"?"Full":"Partial"} refund: KES ${amount}; M-Pesa confirmation ${code}`;
-  db.prepare("INSERT INTO booking_history(booking_id,actor_role,action,details) VALUES(?,?,?,?)")
-    .run(b.id,"trainer","refund_decision",detail);
-  res.json({ok:true,status,amount,confirmationCode:code});
+ const decision=String(req.body.decision||"");if(!["full","partial","credit_full","credit_partial","none"].includes(decision))return res.status(400).json({error:"Choose a refund or credit decision."});
+ const b=db.prepare("SELECT * FROM bookings WHERE id=?").get(req.params.id);if(!b)return res.status(404).json({error:"Booking not found."});
+ const refundable=packageSessionRefundableAmount(b);
+ if(decision==="none"){db.prepare("UPDATE bookings SET payment_status='no_refund',refund_amount=NULL,refund_confirmation_code=NULL,credit_amount=NULL,refund_recorded_at=CURRENT_TIMESTAMP WHERE id=?").run(b.id);db.prepare("INSERT INTO booking_history(booking_id,actor_role,action,details) VALUES(?,?,?,?)").run(b.id,"trainer","refund_decision","No refund or client credit approved.");return res.json({ok:true,status:"no_refund",refundableAmount:refundable})}
+ const isCredit=decision.startsWith("credit_"),isFull=decision==="full"||decision==="credit_full",amount=isFull?refundable:Math.round(Number(req.body.amount));
+ if(!Number.isFinite(amount)||amount<=0)return res.status(400).json({error:isCredit?"Enter the client credit amount in KES.":"Enter the refund amount in KES."});
+ if(amount>refundable)return res.status(400).json({error:`Amount cannot exceed the refundable value of KES ${refundable.toLocaleString()}.`});
+ if(isCredit){const status=isFull?"credited":"credit_partial";db.prepare("UPDATE bookings SET payment_status=?,credit_amount=?,refund_amount=NULL,refund_confirmation_code=NULL,refund_recorded_at=CURRENT_TIMESTAMP WHERE id=?").run(status,amount,b.id);const balance=addClientCredit(b.user_id,amount,"booking",b.id,`${isFull?"Full":"Partial"} client credit from cancelled booking ${b.booking_ref}.`);db.prepare("INSERT INTO booking_history(booking_id,actor_role,action,details) VALUES(?,?,?,?)").run(b.id,"trainer","credit_decision",`${isFull?"Full":"Partial"} client credit: KES ${amount}.`);logActivity({userId:b.user_id,petId:b.pet_id,actorUserId:req.user.id,actorRole:"trainer",action:"client_credit_added",details:`KES ${amount} client credit added from cancelled booking ${b.booking_ref}. Balance KES ${balance}.`});return res.json({ok:true,status,amount,creditBalance:balance,refundableAmount:refundable})}
+ const code=String(req.body.confirmationCode||"").trim();if(!code)return res.status(400).json({error:"Enter the M-Pesa refund/transaction confirmation code."});
+ const status=isFull?"refunded":"refund_partial";db.prepare("UPDATE bookings SET payment_status=?,refund_amount=?,refund_confirmation_code=?,credit_amount=NULL,refund_recorded_at=CURRENT_TIMESTAMP WHERE id=?").run(status,amount,code,b.id);db.prepare("INSERT INTO booking_history(booking_id,actor_role,action,details) VALUES(?,?,?,?)").run(b.id,"trainer","refund_decision",`${isFull?"Full":"Partial"} refund: KES ${amount}; M-Pesa confirmation ${code}`);res.json({ok:true,status,amount,confirmationCode:code,refundableAmount:refundable});
 });
 function rescheduleBookingInternal(req,res,actor){
   const b=db.prepare("SELECT * FROM bookings WHERE id=?").get(req.params.id);
@@ -1852,7 +1875,7 @@ app.get("/api/trainer/clients",requireTrainer,(req,res)=>{
 app.get("/api/trainer/client/:id",requireTrainer,(req,res)=>{
   const user=db.prepare("SELECT id,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,created_at,last_login_at,status_override,COALESCE(client_status,'current') client_status FROM users WHERE id=? AND role='client'").get(req.params.id);
   if(!user)return res.status(404).json({error:"Client not found."}); user.client_status=calculatedClientStatus(user);
-  res.json({user,pets:petDetailsForUser(user.id,true),bookings:db.prepare("SELECT * FROM bookings WHERE user_id=? ORDER BY start_at DESC").all(user.id),packages:db.prepare("SELECT * FROM booking_packages WHERE user_id=? ORDER BY created_at DESC").all(user.id),classes:db.prepare("SELECT e.*,c.title,c.start_date,c.end_date FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.user_id=?").all(user.id),activity:db.prepare(`SELECT a.created_at,a.action,a.details,p.name pet_name,c.title class_title FROM activity_history a LEFT JOIN pets p ON p.id=a.pet_id LEFT JOIN classes c ON c.id=a.class_id WHERE a.user_id=? ORDER BY a.created_at DESC LIMIT 50`).all(user.id)});
+  res.json({user,pets:petDetailsForUser(user.id,true),bookings:db.prepare("SELECT * FROM bookings WHERE user_id=? ORDER BY start_at DESC").all(user.id),packages:db.prepare("SELECT * FROM booking_packages WHERE user_id=? ORDER BY created_at DESC").all(user.id),classes:db.prepare("SELECT e.*,c.title,c.start_date,c.end_date FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.user_id=?").all(user.id),creditBalance:clientCreditBalance(user.id),creditHistory:db.prepare("SELECT * FROM client_credit_ledger WHERE user_id=? ORDER BY created_at DESC LIMIT 30").all(user.id),activity:db.prepare(`SELECT a.created_at,a.action,a.details,p.name pet_name,c.title class_title FROM activity_history a LEFT JOIN pets p ON p.id=a.pet_id LEFT JOIN classes c ON c.id=a.class_id WHERE a.user_id=? ORDER BY a.created_at DESC LIMIT 50`).all(user.id)});
 });
 app.put("/api/trainer/pets/:id/private-notes",requireTrainer,(req,res)=>{
   const pet=db.prepare("SELECT id,user_id,name FROM pets WHERE id=?").get(req.params.id);
@@ -1884,7 +1907,7 @@ app.post("/api/my/bookings/:id/manual-payment",requireAuth,(req,res)=>{
  logActivity({userId:req.user.id,petId:b.pet_id,actorUserId:req.user.id,actorRole:'client',action:'manual_payment_submitted',details:`Manual M-Pesa confirmation submitted for ${pkg?`package ${pkg.name}`:b.booking_ref}.`});
  res.json({ok:true,packageId:pkg?.id||null,amount});
 });
-app.post("/api/trainer/bookings/:id/manual-payment",requireTrainer,(req,res)=>{const b=db.prepare("SELECT * FROM bookings WHERE id=?").get(req.params.id);if(!b||b.manual_payment_status!=='submitted')return res.status(404).json({error:"Manual payment submission not found."});const approve=!!req.body.approve;if(approve){db.prepare("UPDATE bookings SET payment_status='paid',status='confirmed',manual_payment_status='verified',hold_expires_at=NULL WHERE id=?").run(b.id);if(b.package_id){db.prepare("UPDATE booking_packages SET payment_status='paid',status='confirmed',manual_payment_status='verified',hold_expires_at=NULL WHERE id=?").run(b.package_id);db.prepare("UPDATE bookings SET payment_status='paid',status='confirmed',hold_expires_at=NULL WHERE package_id=?").run(b.package_id)}}else{db.prepare("UPDATE bookings SET manual_payment_status='rejected' WHERE id=?").run(b.id);if(b.package_id)db.prepare("UPDATE booking_packages SET manual_payment_status='rejected' WHERE id=?").run(b.package_id)}db.prepare("UPDATE trainer_notifications SET resolved=1 WHERE booking_id=? AND kind='manual_payment'").run(b.id);logActivity({userId:b.user_id,petId:b.pet_id,actorUserId:req.user.id,actorRole:'trainer',action:approve?'manual_payment_verified':'manual_payment_rejected',details:approve?`Manual payment verified for ${b.booking_ref}.`:`Manual payment rejected for ${b.booking_ref}.`});res.json({ok:true})});
+app.post("/api/trainer/bookings/:id/manual-payment",requireTrainer,(req,res)=>{const b=db.prepare("SELECT * FROM bookings WHERE id=?").get(req.params.id);if(!b||b.manual_payment_status!=='submitted')return res.status(404).json({error:"Manual payment submission not found."});const approve=!!req.body.approve;if(approve){db.prepare("UPDATE bookings SET payment_status='paid',status='confirmed',manual_payment_status='verified',hold_expires_at=NULL WHERE id=?").run(b.id);if(b.package_id){db.prepare("UPDATE booking_packages SET payment_status='paid',status='confirmed',manual_payment_status='verified',hold_expires_at=NULL WHERE id=?").run(b.package_id);db.prepare("UPDATE bookings SET payment_status='paid',status='confirmed',hold_expires_at=NULL WHERE package_id=?").run(b.package_id)}}else{db.prepare("UPDATE bookings SET manual_payment_status=NULL,manual_payment_code=NULL,manual_payment_amount=NULL WHERE id=?").run(b.id);if(b.package_id){db.prepare("UPDATE booking_packages SET manual_payment_status=NULL,manual_payment_code=NULL,manual_payment_amount=NULL WHERE id=?").run(b.package_id);db.prepare("UPDATE bookings SET manual_payment_status=NULL,manual_payment_code=NULL,manual_payment_amount=NULL WHERE package_id=?").run(b.package_id)}}db.prepare("UPDATE trainer_notifications SET resolved=1 WHERE booking_id=? AND kind='manual_payment'").run(b.id);logActivity({userId:b.user_id,petId:b.pet_id,actorUserId:req.user.id,actorRole:'trainer',action:approve?'manual_payment_verified':'manual_payment_rejected',details:approve?`Manual payment verified for ${b.booking_ref}.`:`Manual payment rejected for ${b.booking_ref}.`});res.json({ok:true})});
 
 function createClientRescheduleRequest(req,res){expireTimedHolds();const b=db.prepare("SELECT * FROM bookings WHERE id=? AND user_id=?").get(req.params.id,req.user.id);if(!b||b.status!=='confirmed'||!["paid","demo_paid"].includes(b.payment_status))return res.status(404).json({error:"Confirmed booking not found."});const used=b.package_id?db.prepare("SELECT reschedule_count n FROM booking_packages WHERE id=?").get(b.package_id)?.n:Number(b.reschedule_count||0);if(Number(used)>=3)return res.status(409).json({error:"The three client-requested reschedules have been used. Please contact Amy."});if(db.prepare("SELECT 1 FROM reschedule_requests WHERE booking_id=? AND status='pending'").get(b.id))return res.status(409).json({error:"A reschedule request is already waiting for Amy."});const startAt=String(req.body.startAt||'');if(!privateBookingDateAllowed(startAt))return res.status(409).json({error:"Choose an appointment from tomorrow onwards."});const duration=Math.round((wallClockMs(b.end_at)-wallClockMs(b.start_at))/60000),buffer=b.location_type==='arena'?0:Math.max(30,b.travel_minutes||0),endAt=addMinutes(startAt,duration),bufferEnd=addMinutes(endAt,buffer);if(!withinWorkingHours(startAt,endAt)||recurringBlockConflict(startAt,endAt)||serviceUnavailable(b.location_type,startAt,bufferEnd)||scheduleBlockConflict(b.location_type,startAt,bufferEnd))return res.status(409).json({error:"That requested time is unavailable."});const others=db.prepare("SELECT * FROM bookings WHERE id!=? AND status NOT IN ('cancelled','expired') AND payment_status IN ('paid','demo_paid','pending')").all(b.id);if(others.some(o=>overlaps(startAt,bufferEnd,o.start_at,o.buffer_end_at))||activeRescheduleHoldConflict(startAt,bufferEnd,b.id))return res.status(409).json({error:"That requested time is already held or booked."});const classes=db.prepare("SELECT * FROM class_sessions").all();if(classes.some(x=>overlaps(startAt,bufferEnd,isoDateTime(x.session_date,x.start_time),isoDateTime(x.session_date,x.end_time))))return res.status(409).json({error:"That requested time overlaps a class."});const hold=addHoursIso(24);const id=db.prepare("INSERT INTO reschedule_requests(booking_id,user_id,old_start_at,proposed_start_at,proposed_end_at,proposed_buffer_end_at,hold_expires_at,client_note) VALUES(?,?,?,?,?,?,?,?)").run(b.id,req.user.id,b.start_at,startAt,endAt,bufferEnd,hold,String(req.body.note||'').trim()||null).lastInsertRowid;notifyTrainer({userId:req.user.id,petId:b.pet_id,bookingId:b.id,kind:'reschedule_request',message:`Client requested a reschedule for ${b.booking_ref}: ${b.start_at} → ${startAt}.`});logActivity({userId:req.user.id,petId:b.pet_id,actorUserId:req.user.id,actorRole:'client',action:'reschedule_requested',details:`${b.start_at} → ${startAt}; held for Amy until ${hold}.`});res.json({ok:true,id,holdExpiresAt:hold})}
 app.post("/api/trainer/reschedule-requests/:id/decision",requireTrainer,(req,res)=>{expireTimedHolds();const r=db.prepare("SELECT rr.*,b.package_id,b.pet_id FROM reschedule_requests rr JOIN bookings b ON b.id=rr.booking_id WHERE rr.id=?").get(req.params.id);if(!r||r.status!=='pending')return res.status(404).json({error:"Reschedule request not found or expired."});const decision=String(req.body.decision||'');if(!['approve','decline'].includes(decision))return res.status(400).json({error:"Choose approve or decline."});const note=String(req.body.note||'').trim();if(decision==='approve'){db.prepare("UPDATE bookings SET start_at=?,end_at=?,buffer_end_at=?,reschedule_count=reschedule_count+1 WHERE id=?").run(r.proposed_start_at,r.proposed_end_at,r.proposed_buffer_end_at,r.booking_id);if(r.package_id)db.prepare("UPDATE booking_packages SET reschedule_count=reschedule_count+1 WHERE id=?").run(r.package_id);db.prepare("UPDATE reschedule_requests SET status='approved',trainer_note=?,decided_at=CURRENT_TIMESTAMP WHERE id=?").run(note||null,r.id)}else db.prepare("UPDATE reschedule_requests SET status='declined',trainer_note=?,decided_at=CURRENT_TIMESTAMP WHERE id=?").run(note||null,r.id);db.prepare("UPDATE trainer_notifications SET resolved=1 WHERE booking_id=? AND kind='reschedule_request'").run(r.booking_id);logActivity({userId:r.user_id,petId:r.pet_id,actorUserId:req.user.id,actorRole:'trainer',action:decision==='approve'?'reschedule_approved':'reschedule_declined',details:decision==='approve'?`${r.old_start_at} → ${r.proposed_start_at}.`:`Reschedule request declined.${note?' '+note:''}`});res.json({ok:true})});

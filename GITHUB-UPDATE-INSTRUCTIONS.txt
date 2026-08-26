@@ -1,24 +1,15 @@
-v21.9.6 UI/payment stabilisation
+v21.9.7
+Replace server.js, package.json, VERSION.txt, GITHUB-UPDATE-INSTRUCTIONS.txt, public/app.js, public/styles.css and public/index.html.
+Do NOT reset the database.
 
-Replace in GitHub:
-- server.js
-- package.json
-- VERSION.txt
-- public/app.js
-- public/styles.css
-- public/index.html
-
-No database reset.
-
-After Render redeploys, Ctrl+F5 and test:
-1. Client portal tabs on PC/iPad/iPhone/Android.
-2. Client class cancellation: in-app dialogue, no browser suppress-dialogues control.
-3. Client private cancellation and Do not accept package: in-app dialogue.
-4. Amy appointment detail on desktop and narrow/mobile view.
-5. Automatic single booking payment: success screen has Return to Client Portal only.
-6. Trainer-created package automatic payment.
-7. Trainer-created package manual payment: code + amount submit once, then Awaiting Amy verification.
-8. iPad manual-payment spacing.
-9. Partial refund amount visible in client portal.
-
-The old class Awaiting payment recovery, Amy Payment received override, and client credit are deliberately not included in this build.
+Test:
+1 registration with a new email + accidental double tap
+2 reschedule opens on booking date; notes visible both sides
+3 manual M-Pesa reject then retry automatic/manual
+4 cancelled paid package session: no Cancel again; refundable value shown
+5 Full refund auto amount; Partial refund
+6 Full credit / Partial credit; balance visible in Amy client record and client Account
+7 5-session custom package = first date + 4 additional date pickers
+8 declined package stays bundled under All bookings
+9 Awaiting action first, Upcoming next, inactive greyed under All
+10 iPhone report date controls

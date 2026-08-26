@@ -1,19 +1,3 @@
-The Custom Made Canine v21.9.6 ONLINE TEST
-
-UI/payment stabilisation after v21.9.5:
-- All native browser alert/confirm/prompt calls are replaced by in-app dialogs.
-- Client class/private cancellations and trainer confirmations therefore no longer expose browser 'suppress dialogues'.
-- Client portal tabs/buttons have consistent rounded corners, padding and centred Review/Account text across iPad/iPhone/Android.
-- Amy appointment detail has a stable two-column desktop layout and retains the narrow single-column layout.
-- Successful automatic payment confirmation now has only Return to Client Portal.
-- Trainer-created package automatic payment preserves package payment type (fix for unresponsive package demo/automatic payment button).
-- Manual package payment is package-aware, validates fields clearly, stores one submission, prevents duplicate submissions, and shows Awaiting Amy payment verification.
-- Manual payment confirmation includes the WhatsApp Amy reminder.
-- iPad/manual M-Pesa form spacing prevents the submit button overlapping code/amount fields.
-- Partial/full refund amounts are shown explicitly to the client where refund data is present.
-
-Not included yet:
-- Old stranded class Awaiting payment recovery.
-- Amy's new Cash payment received / Complimentary / Other override.
-- Client credit balance.
-Those remain the next financial-workflow phase.
+The Custom Made Canine v21.9.7 ONLINE TEST
+Stabilisation: registration reliability, reschedule date/notes, rejected manual-payment recovery, package-session refund values, refund/client-credit decisions, custom package date consistency, bundled inactive packages, Awaiting action/Upcoming/All bookings hierarchy, grey inactive records, and iPhone report-date containment.
+Client credit can now be CREATED and viewed; applying credit to a new checkout remains a later payment step.

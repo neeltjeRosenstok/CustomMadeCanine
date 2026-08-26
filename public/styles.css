@@ -856,3 +856,13 @@ b,strong{font-weight:500}
   justify-content:flex-end!important;
   margin-top:18px!important;
 }
+
+/* v21.9.7 stabilisation */
+.report-controls,.report-controls .form-grid,.report-controls label{min-width:0!important}
+.report-controls input[type="date"],.report-controls select{width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important}
+@media(max-width:520px){.report-controls .form-grid{grid-template-columns:1fr!important}.report-controls{padding:12px!important;overflow:hidden!important}.report-controls input[type="date"]{display:block!important;-webkit-appearance:none;appearance:none;font-size:16px!important}}
+.inactive-booking{opacity:.62;filter:saturate(.55);background:rgba(120,120,120,.06)!important}
+.booking-view-toggle{display:flex;gap:8px;margin:0 0 12px;flex-wrap:wrap}.booking-view-toggle button{-webkit-appearance:none;appearance:none;border:1px solid var(--line);border-radius:999px;padding:8px 13px;background:var(--white);color:var(--navy)}.booking-view-toggle button.active{background:var(--navy);color:var(--cream);border-color:var(--navy)}
+.booking-section-title{margin:14px 0 4px;color:var(--navy)}.refund-value{display:flex;align-items:center;padding:8px 10px;border-radius:10px;background:rgba(37,33,94,.07)}
+.credit-balance-card{display:grid;gap:3px;padding:12px 14px;margin:0 0 16px;border:1px solid rgba(37,33,94,.18);border-radius:14px;background:rgba(227,220,200,.25)}.credit-balance-card strong{font-size:1.25rem}
+.custom-package-dates{display:grid;gap:8px;margin:12px 0}.custom-package-dates input[readonly]{opacity:.72}#authSubmitBtn:disabled{opacity:.65;cursor:wait}
