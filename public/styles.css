@@ -1017,3 +1017,15 @@ b,strong{font-weight:500}
 .trainer-reschedule-times .time{
   min-width:76px;
 }
+
+
+/* v21.9.12a iPad/tablet home alignment hotfix
+   iPad landscape can report a viewport wider than 1100 CSS px.
+   align-self:start also prevents the intro grid item from stretching
+   to the height of the reviews column before its flex content is aligned. */
+@media (hover:none) and (pointer:coarse) and (min-width:801px){
+  .home-intro{
+    align-self:start!important;
+    justify-content:flex-start!important;
+  }
+}
