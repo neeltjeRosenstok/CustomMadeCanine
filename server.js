@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.9-online-test";
+const APP_VERSION = "21.9.11-online-test";
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -1872,6 +1872,52 @@ app.post("/api/my/bookings/:id/decline-provisional",requireAuth,(req,res)=>{
 });
 app.post("/api/trainer/notes",requireTrainer,(req,res)=>{const {userId,petId,bookingId,note,clientVisible}=req.body;if(!userId||!String(note||"").trim())return res.status(400).json({error:"Client and note are required."});const id=db.prepare("INSERT INTO training_notes(user_id,pet_id,booking_id,note,client_visible) VALUES(?,?,?,?,?)").run(userId,petId||null,bookingId||null,String(note).trim(),clientVisible?1:0).lastInsertRowid;if(bookingId)db.prepare("INSERT INTO booking_history(booking_id,actor_role,action,details) VALUES(?,?,?,?)").run(bookingId,"trainer","note_added",String(note).trim());res.json({id})});
 app.get("/api/trainer/notes/:userId",requireTrainer,(req,res)=>res.json(db.prepare("SELECT n.*,p.name pet_name FROM training_notes n LEFT JOIN pets p ON p.id=n.pet_id WHERE n.user_id=? ORDER BY n.created_at DESC").all(req.params.userId)));
+
+app.get("/api/trainer/bookings/:id/reschedule-availability",requireTrainer,async(req,res)=>{
+  expireTimedHolds();
+  const b=db.prepare("SELECT * FROM bookings WHERE id=?").get(req.params.id);
+  if(!b)return res.status(404).json({error:"Booking not found."});
+  const date=String(req.query.date||"");
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return res.status(400).json({error:"Choose a valid date."});
+  if(!privateBookingDateAllowed(`${date}T00:00:00`))return res.status(400).json({error:"Private appointments can be rescheduled from tomorrow onwards."});
+
+  const duration=Math.max(1,Math.round((wallClockMs(b.end_at)-wallClockMs(b.start_at))/60000));
+  const working=workingWindowForDate(date);
+  if(!working.enabled||!working.start_time||!working.end_time)return res.json({slots:[],message:"Amy is not working on this date."});
+
+  const ws=wallClockMs(isoDateTime(date,working.start_time)),we=wallClockMs(isoDateTime(date,working.end_time));
+  let travel=0;
+  if(b.location_type==="home"&&b.address)travel=await routeTravelMinutes(b.address,"Nairobi, Kenya");
+  const buffer=b.location_type==="arena"?0:Math.max(30,travel);
+
+  const existing=db.prepare("SELECT id,start_at,buffer_end_at FROM bookings WHERE id!=? AND status NOT IN ('cancelled','expired') AND payment_status IN ('pending','paid','demo_paid','credit_paid')").all(b.id);
+  const blocked=db.prepare("SELECT start_at,end_at FROM availability_blocks").all();
+  const classSessions=db.prepare("SELECT session_date,start_time,end_time FROM class_sessions").all();
+  const slots=[];
+
+  for(let cursor=ws;cursor<we;cursor+=30*60000){
+    const start=wallClockIso(cursor),end=addMinutes(start,duration),bufferEnd=addMinutes(end,buffer);
+    if(String(end).slice(0,10)!==date)continue;
+    if(wallClockMs(end)>we)continue;
+    if(serviceUnavailable(b.location_type,start,bufferEnd))continue;
+    if(scheduleBlockConflict(b.location_type,start,bufferEnd))continue;
+    if(recurringBlockConflict(start,end))continue;
+    if(existing.some(x=>overlaps(start,bufferEnd,x.start_at,x.buffer_end_at)))continue;
+    if(activeRescheduleHoldConflict(start,bufferEnd,b.id))continue;
+    if(blocked.some(x=>overlaps(start,bufferEnd,x.start_at,x.end_at)))continue;
+    if(classSessions.some(x=>overlaps(start,bufferEnd,isoDateTime(x.session_date,x.start_time),isoDateTime(x.session_date,x.end_time))))continue;
+    slots.push({start,end,bufferMinutes:buffer,travelMinutes:travel});
+  }
+
+  let message="";
+  if(!slots.length){
+    if(serviceUnavailable(b.location_type,`${date}T${working.start_time}:00`,`${date}T${working.end_time}:00`)){
+      message=b.location_type==="home"?"Home visits are unavailable on this date.":"Amy's arena is unavailable on this date.";
+    }else message="No available times on this date. Please choose another date.";
+  }
+  res.json({slots,message});
+});
+
 app.post("/api/trainer/bookings/:id/reschedule",requireTrainer,(req,res)=>rescheduleBookingInternal(req,res,"trainer"));
 app.post("/api/trainer/bookings/:id/cancel",requireTrainer,(req,res)=>cancelBookingInternal(req,res,"trainer"));
 app.post("/api/trainer/bookings/:id/refund",requireTrainer,(req,res)=>{
@@ -1907,7 +1953,31 @@ function rescheduleBookingInternal(req,res,actor){
   db.prepare("UPDATE bookings SET start_at=?,end_at=?,buffer_end_at=? WHERE id=?").run(startAt,endAt,bufferEnd,b.id);
   db.prepare("INSERT INTO booking_history(booking_id,actor_role,action,details) VALUES(?,?,?,?)").run(b.id,actor,"rescheduled",`${b.start_at} → ${startAt}`);
   res.json({ok:true});
-}function cancelBookingInternal(req,res,actor){const b=db.prepare("SELECT * FROM bookings WHERE id=?").get(req.params.id);if(!b)return res.status(404).json({error:"Booking not found."});if(actor==='client'&&b.user_id!==req.user.id)return res.status(403).json({error:"Booking not found."});db.prepare("UPDATE bookings SET status='cancelled',payment_status=CASE WHEN payment_status IN ('paid','demo_paid') THEN 'refund_pending' ELSE 'cancelled' END WHERE id=?").run(b.id);db.prepare("INSERT INTO booking_history(booking_id,actor_role,action,details) VALUES(?,?,?,?)").run(b.id,actor,"cancelled",req.body.reason||`Cancelled by ${actor}; refund decision pending.`);res.json({ok:true})}
+}function cancelBookingInternal(req,res,actor){
+ const b=db.prepare("SELECT * FROM bookings WHERE id=?").get(req.params.id);
+ if(!b)return res.status(404).json({error:"Booking not found."});
+ if(actor==='client'&&b.user_id!==req.user.id)return res.status(403).json({error:"Booking not found."});
+ if(b.status==='cancelled'){
+   return res.status(409).json({error:"This booking is already cancelled."});
+ }
+ const paid=["paid","demo_paid","credit_paid"].includes(b.payment_status);
+ const nextPayment=paid?"refund_pending":"cancelled";
+ const reason=String(req.body.reason||"").trim()||`Cancelled by ${actor}.`;
+ db.prepare("UPDATE bookings SET status='cancelled',payment_status=? WHERE id=?").run(nextPayment,b.id);
+ db.prepare("INSERT INTO booking_history(booking_id,actor_role,action,details) VALUES(?,?,?,?)").run(
+   b.id,actor,actor==="client"?"cancelled_by_client":"cancelled_by_trainer",
+   `${reason}${paid?" Refund / credit decision required.":""}`
+ );
+ logActivity({
+   userId:b.user_id,petId:b.pet_id,actorUserId:req.user.id,actorRole:actor,
+   action:actor==="client"?"booking_cancelled_by_client":"booking_cancelled_by_trainer",
+   details:`${actor==="client"?"Client":"Amy"} cancelled ${b.booking_ref}.${paid?" Refund / credit decision required.":""}`
+ });
+ if(actor==="client"&&paid){
+   notifyTrainer({userId:b.user_id,petId:b.pet_id,bookingId:b.id,kind:"cancellation",message:`Client cancelled ${b.booking_ref}. Refund / credit decision required.`});
+ }
+ res.json({ok:true,refundPending:paid,status:"cancelled"});
+}
 
 app.get("/api/trainer/reviews/:id/photo",requireTrainer,(req,res)=>{
   const r=db.prepare("SELECT photo_filename FROM reviews WHERE id=?").get(req.params.id);

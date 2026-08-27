@@ -1,3 +1,12 @@
-The Custom Made Canine v21.9.9 ONLINE TEST
+The Custom Made Canine v21.9.11 ONLINE TEST
 
-Correction batch: iPhone emphasis/date height, payment scroll-to-top, cancelled/refund modal cleanup, Close wording, global uppercase M-Pesa refs, 10-char refund validation, preserved manual-code input, human-readable account update, compact Refund/Credit report method, T&C readability styling, and CMC home-screen icons/manifest from the existing logo.
+Small scheduling cleanup:
+- Amy's reschedule flow no longer uses a free-form datetime-local/per-minute control.
+- Trainer rescheduling now starts on the booking's current date, loads only valid half-hour availability slots, keeps the existing appointment duration, and submits only a selected available slot.
+- A clear message is shown when no trainer-reschedule slots are available.
+- The availability calculation excludes the booking being moved, while still checking working hours, blocks, classes, other bookings, home-travel buffer and reschedule holds.
+- Amy's day agenda visually merges all 30-minute pieces of the same appointment into one continuous appointment item.
+- Class sessions are also displayed as one continuous item instead of repeated half-hour sections.
+- Underlying 30-minute scheduling/conflict logic is unchanged.
+
+This is intentionally a small correction on top of v21.9.10.

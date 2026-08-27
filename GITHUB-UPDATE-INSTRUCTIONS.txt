@@ -1,4 +1,21 @@
-v21.9.9
-Replace server.js, package.json, VERSION.txt, GITHUB-UPDATE-INSTRUCTIONS.txt, public/app.js, public/styles.css, public/index.html, public/manifest.webmanifest and the new icon PNG files. Do NOT reset the database.
+v21.9.11 SMALL SCHEDULING CLEANUP
 
-Test: iPhone emphasis/date height; Confirm & Pay opens at top; Handle refund shows financial choices immediately and Close; refund M-Pesa ref exact 10 chars + CAPS; manual invalid code remains; account update wording; report Refund/Credit as KES amount / method; save to iPhone/Android home screen and confirm CMC icon/label.
+Replace:
+- server.js
+- package.json
+- VERSION.txt
+- GITHUB-UPDATE-INSTRUCTIONS.txt
+- public/app.js
+- public/styles.css
+- public/index.html
+
+Do NOT reset the database.
+
+Test after Render deploy + Ctrl+F5:
+1. Open a confirmed appointment from Amy's dashboard and press Reschedule.
+2. It should open on the appointment's current date.
+3. There should be a normal date picker plus half-hour available-time buttons only — no per-minute datetime field.
+4. Pick a date with no availability: a clear message should appear.
+5. Pick an available slot and confirm: booking should reschedule normally.
+6. Check Amy's day agenda: a 60-minute booking should appear once as 60 minutes, and a 90-minute consultation once as 90 minutes, not as separate 30-minute appointment rows.
+7. Quickly confirm blocks/buffers/classes still display sensibly and availability/conflict rules still work.
