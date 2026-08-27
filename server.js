@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.11-online-test";
+const APP_VERSION = "21.9.12b-online-test";
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -1399,7 +1399,7 @@ app.get("/api/trainer/summary",requireTrainer,(req,res)=>{
     pendingReviews:db.prepare("SELECT r.*,u.name FROM reviews r JOIN users u ON u.id=r.user_id WHERE r.status='pending' ORDER BY r.created_at DESC").all(),
     vaccinationAttention:db.prepare(`SELECT p.id pet_id,p.name pet_name,p.breed,p.vaccination_status,p.vaccination_verified_at,u.id user_id,u.name client_name,(SELECT COUNT(*) FROM pet_files f WHERE f.pet_id=p.id AND f.kind='vaccination') vaccination_count FROM pets p JOIN users u ON u.id=p.user_id WHERE COALESCE(p.archived,0)=0 AND p.vaccination_status IN ('pending','rejected','not_provided') ORDER BY p.name`).all(),
     cancellationAttention:db.prepare(`SELECT b.id,b.user_id,b.pet_id,b.booking_ref,b.start_at,b.end_at,b.service,b.location_type,b.address,b.payment_status,b.status,b.price,b.package_id,b.refund_amount,b.refund_confirmation_code,b.credit_amount,u.name client_name,u.email client_email,COALESCE(u.whatsapp_phone,u.phone) client_phone,p.name pet_name,bp.name package_name,bp.package_price FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id LEFT JOIN booking_packages bp ON bp.id=b.package_id WHERE b.payment_status='refund_pending' ORDER BY b.start_at DESC`).all().map(b=>({...b,refundable_amount:packageSessionRefundableAmount(b)})),
-    classRefundAttention:db.prepare(`SELECT e.id,e.class_id,e.booking_ref,e.payment_status,c.title,c.price,u.name client_name,p.name pet_name FROM class_enrolments e JOIN classes c ON c.id=e.class_id JOIN users u ON u.id=e.user_id LEFT JOIN pets p ON p.id=e.pet_id WHERE e.enrolment_status IN ('rejected','cancelled_by_client') AND e.payment_status='refund_pending' ORDER BY e.rejected_at DESC`).all(),
+    classRefundAttention:db.prepare(`SELECT e.id,e.class_id,e.booking_ref,e.payment_status,e.enrolment_status,e.rejected_reason,c.title,c.price,u.name client_name,p.name pet_name FROM class_enrolments e JOIN classes c ON c.id=e.class_id JOIN users u ON u.id=e.user_id LEFT JOIN pets p ON p.id=e.pet_id WHERE e.payment_status='refund_pending' AND e.enrolment_status!='active' ORDER BY e.rejected_at DESC,e.id DESC`).all(),
     rescheduleAttention:db.prepare(`SELECT rr.*,b.booking_ref,b.service,b.location_type,u.name client_name,p.name pet_name FROM reschedule_requests rr JOIN bookings b ON b.id=rr.booking_id JOIN users u ON u.id=rr.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE rr.status='pending' AND datetime(rr.hold_expires_at)>datetime('now') ORDER BY rr.created_at`).all(),
     manualPaymentAttention:db.prepare(`SELECT b.id,b.booking_ref,COALESCE(NULLIF(b.price,0),bp.package_price,0) price,b.manual_payment_code,b.manual_payment_amount,u.name client_name,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id LEFT JOIN booking_packages bp ON bp.id=b.package_id WHERE b.manual_payment_status='submitted' ORDER BY b.created_at`).all(),
     notifications:db.prepare("SELECT n.*,u.name client_name,p.name pet_name FROM trainer_notifications n LEFT JOIN users u ON u.id=n.user_id LEFT JOIN pets p ON p.id=n.pet_id WHERE n.resolved=0 ORDER BY n.created_at DESC LIMIT 30").all(),
@@ -1668,16 +1668,16 @@ app.post("/api/trainer/class-enrolments/:id/reject",requireTrainer,(req,res)=>{
     WHERE e.id=?
   `).get(req.params.id);
   if(!e)return res.status(404).json({error:"Class enrolment not found."});
-  if(e.enrolment_status==='rejected')return res.status(409).json({error:"This dog has already been rejected from the class."});
+  if(e.enrolment_status!=='active')return res.status(409).json({error:"This class enrolment is already cancelled."});
   const reason=String(req.body.reason||"").trim();
   if(!reason)return res.status(400).json({error:"Please record a short reason for rejecting this dog from the class."});
   const paid=['paid','demo_paid','credit_paid'].includes(e.payment_status);
   db.prepare(`UPDATE class_enrolments
-              SET enrolment_status='rejected',rejected_reason=?,rejected_at=CURRENT_TIMESTAMP,rejected_by=?,
+              SET enrolment_status='cancelled_by_trainer',rejected_reason=?,rejected_at=CURRENT_TIMESTAMP,rejected_by=?,
                   payment_status=?
               WHERE id=?`)
     .run(reason,req.user.id,paid?'refund_pending':'cancelled',e.id);
-  logActivity({userId:e.user_id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"trainer",action:"class_rejected",details:`${e.pet_name||"Dog"} rejected from ${e.title}. Reason: ${reason}${paid?" Refund decision required.":""}`});
+  logActivity({userId:e.user_id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"trainer",action:"class_cancelled_by_trainer",details:`Amy cancelled ${e.pet_name||"Dog"} from ${e.title}. Reason: ${reason}${paid?" Refund decision required.":""}`});
   res.json({ok:true,refundPending:paid});
 });
 
@@ -1690,7 +1690,7 @@ app.post("/api/trainer/class-enrolments/:id/refund",requireTrainer,(req,res)=>{
     WHERE e.id=?
   `).get(req.params.id);
   if(!e)return res.status(404).json({error:"Class enrolment not found."});
-  if(!['rejected','cancelled_by_client'].includes(e.enrolment_status))return res.status(409).json({error:"Only cancelled class enrolments can have a refund decision."});
+  if(e.enrolment_status==='active'||e.payment_status!=='refund_pending')return res.status(409).json({error:"Only cancelled class enrolments awaiting a refund decision can be handled here."});
   const decision=String(req.body.decision||"");
   if(!["full","partial","none"].includes(decision))return res.status(400).json({error:"Choose full, partial or no refund."});
   let amount=null,code=null,status="no_refund";
@@ -1704,7 +1704,7 @@ app.post("/api/trainer/class-enrolments/:id/refund",requireTrainer,(req,res)=>{
   }
   db.prepare("UPDATE class_enrolments SET payment_status=?,refund_amount=?,refund_confirmation_code=?,refund_recorded_at=CURRENT_TIMESTAMP WHERE id=?")
     .run(status,amount,code,e.id);
-  const details=decision==="none"?`No refund recorded for ${e.pet_name||"dog"} after rejection from ${e.title}.`:`${decision==="full"?"Full":"Partial"} class refund KES ${amount}; M-Pesa ${code}.`;
+  const details=decision==="none"?`No refund recorded for ${e.pet_name||"dog"} after cancellation from ${e.title}.`:`${decision==="full"?"Full":"Partial"} class refund KES ${amount}; M-Pesa ${code}.`;
   logActivity({userId:e.user_id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"trainer",action:"class_refund_decision",details});
   res.json({ok:true});
 });

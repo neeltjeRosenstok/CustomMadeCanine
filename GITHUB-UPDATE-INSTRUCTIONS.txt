@@ -1,4 +1,4 @@
-v21.9.11 SMALL SCHEDULING CLEANUP
+v21.9.12b CLASS REFUND HOTFIX
 
 Replace:
 - server.js
@@ -6,16 +6,14 @@ Replace:
 - VERSION.txt
 - GITHUB-UPDATE-INSTRUCTIONS.txt
 - public/app.js
-- public/styles.css
 - public/index.html
 
 Do NOT reset the database.
 
-Test after Render deploy + Ctrl+F5:
-1. Open a confirmed appointment from Amy's dashboard and press Reschedule.
-2. It should open on the appointment's current date.
-3. There should be a normal date picker plus half-hour available-time buttons only — no per-minute datetime field.
-4. Pick a date with no availability: a clear message should appear.
-5. Pick an available slot and confirm: booking should reschedule normally.
-6. Check Amy's day agenda: a 60-minute booking should appear once as 60 minutes, and a 90-minute consultation once as 90 minutes, not as separate 30-minute appointment rows.
-7. Quickly confirm blocks/buffers/classes still display sensibly and availability/conflict rules still work.
+Test:
+1. Open Needs Attention now: the already-pending paid class cancellation should be visible if it is non-active and refund_pending.
+2. Amy cancels another paid class enrolment.
+3. Needs Attention should show a Class cancellation item with Handle refund.
+4. Handle refund should open the correct cancelled dog and allow the refund decision immediately.
+5. Complete the decision and confirm the counter/item clears.
+6. Confirm the large iPad Pro home alignment remains fixed.

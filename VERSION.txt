@@ -1,12 +1,11 @@
-The Custom Made Canine v21.9.11 ONLINE TEST
+The Custom Made Canine v21.9.12b ONLINE TEST
 
-Small scheduling cleanup:
-- Amy's reschedule flow no longer uses a free-form datetime-local/per-minute control.
-- Trainer rescheduling now starts on the booking's current date, loads only valid half-hour availability slots, keeps the existing appointment duration, and submits only a selected available slot.
-- A clear message is shown when no trainer-reschedule slots are available.
-- The availability calculation excludes the booking being moved, while still checking working hours, blocks, classes, other bookings, home-travel buffer and reschedule holds.
-- Amy's day agenda visually merges all 30-minute pieces of the same appointment into one continuous appointment item.
-- Class sessions are also displayed as one continuous item instead of repeated half-hour sections.
-- Underlying 30-minute scheduling/conflict logic is unchanged.
+Tiny class-cancellation refund hotfix:
+- Trainer-initiated class cancellations now use the explicit status cancelled_by_trainer.
+- Needs Attention no longer relies on a fragile list of cancellation statuses: every non-active class enrolment with payment_status=refund_pending is shown.
+- The class refund endpoint uses the same rule, so Amy can handle any cancelled enrolment that is genuinely awaiting a refund decision.
+- Existing older trainer-cancelled records using the legacy rejected status remain compatible.
+- Class history now labels future trainer cancellations as “Cancelled by Amy”.
+- The v21.9.12a large-iPad home alignment fix is preserved.
 
-This is intentionally a small correction on top of v21.9.10.
+No database reset or migration is required.
