@@ -88,7 +88,7 @@ function shell(content){
   </div>`;
 }
 function toggleMenu(){state.menu=!state.menu;render()}
-function go(v){state.view=v;state.menu=false;render();if(p==='payment'){requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'auto'}));}}
+function go(v){state.view=v;state.menu=false;render();if(v==='payment'){requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'auto'}));}}
 function home(){
  const reviews=state.reviews||[];
  return `<section class="screen home-screen"><div class="home-layout">
