@@ -1029,3 +1029,59 @@ b,strong{font-weight:500}
     justify-content:flex-start!important;
   }
 }
+
+
+/* v21.9.13 cancelled class enrolment / refund cleanup */
+.class-cancelled-list{
+  display:grid;
+  gap:8px;
+  margin-top:8px;
+}
+.class-cancelled-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:8px;
+  padding:12px 0;
+  border-bottom:1px solid var(--line);
+}
+.class-cancelled-row:last-child{border-bottom:0}
+.class-cancelled-copy{
+  display:grid;
+  gap:3px;
+  min-width:0;
+}
+.class-cancelled-name{
+  font-weight:500;
+  color:var(--navy);
+}
+.class-cancelled-copy small{
+  color:#27465d;
+  line-height:1.4;
+}
+.class-cancelled-row:not(.needs-refund){
+  opacity:.72;
+}
+.class-cancelled-row.needs-refund{
+  padding:12px;
+  border:1px solid rgba(37,33,94,.18);
+  border-radius:12px;
+  background:rgba(255,255,255,.5);
+}
+.class-refund-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:center;
+}
+.class-refund-actions .compact-button{
+  margin:0!important;
+}
+@media(max-width:700px){
+  .class-refund-actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+  }
+  .class-refund-actions .compact-button:last-child{
+    grid-column:1/-1;
+  }
+}

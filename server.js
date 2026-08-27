@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.12c-online-test";
+const APP_VERSION = "21.9.13-online-test";
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -1690,24 +1690,41 @@ app.post("/api/trainer/class-enrolments/:id/refund",requireTrainer,(req,res)=>{
     WHERE e.id=?
   `).get(req.params.id);
   if(!e)return res.status(404).json({error:"Class enrolment not found."});
-  if(e.enrolment_status==='active'||e.payment_status!=='refund_pending')return res.status(409).json({error:"Only cancelled class enrolments awaiting a refund decision can be handled here."});
+  if(e.enrolment_status==='active'||e.payment_status!=='refund_pending')return res.status(409).json({error:"Only cancelled class enrolments awaiting a refund or credit decision can be handled here."});
+
   const decision=String(req.body.decision||"");
-  if(!["full","partial","none"].includes(decision))return res.status(400).json({error:"Choose full, partial or no refund."});
-  let amount=null,code=null,status="no_refund";
-  if(decision!=="none"){
-    amount=Number(req.body.amount);
-    code=String(req.body.code||"").trim();
-    if(!Number.isFinite(amount)||amount<=0)return res.status(400).json({error:"Enter the refund amount in KES."});
-    if(!/^[A-Z0-9]{10}$/.test(code))return res.status(400).json({error:"Enter the full 10-character M-Pesa refund confirmation reference."});
-    if(decision==="full"&&amount!==Number(e.price||0))return res.status(400).json({error:`A full refund must equal KES ${Number(e.price||0).toLocaleString()}.`});
-    status=decision==="full"?"refunded":"refund_partial";
+  if(!["full","partial","credit_full","credit_partial","none"].includes(decision))return res.status(400).json({error:"Choose a refund or credit decision."});
+
+  const fullAmount=Number(e.price||0);
+  if(decision==="none"){
+    db.prepare("UPDATE class_enrolments SET payment_status='no_refund',refund_amount=NULL,refund_confirmation_code=NULL,refund_recorded_at=CURRENT_TIMESTAMP WHERE id=?").run(e.id);
+    logActivity({userId:e.user_id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"trainer",action:"class_refund_decision",details:`No refund or client credit recorded for ${e.pet_name||"dog"} after cancellation from ${e.title}.`});
+    return res.json({ok:true,status:"no_refund"});
   }
+
+  const isCredit=decision.startsWith("credit_");
+  const isFull=decision==="full"||decision==="credit_full";
+  const amount=isFull?fullAmount:Number(req.body.amount);
+  if(!Number.isFinite(amount)||amount<=0)return res.status(400).json({error:isCredit?"Enter the client credit amount in KES.":"Enter the refund amount in KES."});
+  if(amount>fullAmount)return res.status(400).json({error:`Amount cannot exceed KES ${fullAmount.toLocaleString()}.`});
+
+  if(isCredit){
+    const status=isFull?"credited":"credit_partial";
+    db.prepare("UPDATE class_enrolments SET payment_status=?,refund_amount=NULL,refund_confirmation_code=NULL,refund_recorded_at=CURRENT_TIMESTAMP WHERE id=?").run(status,e.id);
+    const balance=addClientCredit(e.user_id,amount,"class_enrolment",e.id,`${isFull?"Full":"Partial"} credit for cancelled class ${e.title}`);
+    logActivity({userId:e.user_id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"trainer",action:"class_credit_decision",details:`${isFull?"Full":"Partial"} client credit KES ${amount} recorded for ${e.pet_name||"dog"} after cancellation from ${e.title}. Balance KES ${balance}.`});
+    return res.json({ok:true,status,amount,creditBalance:balance});
+  }
+
+  const code=normalizeMpesaReference(req.body.code);
+  if(!/^[A-Z0-9]{10}$/.test(code))return res.status(400).json({error:"Enter the full 10-character M-Pesa refund confirmation reference."});
+  const status=isFull?"refunded":"refund_partial";
   db.prepare("UPDATE class_enrolments SET payment_status=?,refund_amount=?,refund_confirmation_code=?,refund_recorded_at=CURRENT_TIMESTAMP WHERE id=?")
     .run(status,amount,code,e.id);
-  const details=decision==="none"?`No refund recorded for ${e.pet_name||"dog"} after cancellation from ${e.title}.`:`${decision==="full"?"Full":"Partial"} class refund KES ${amount}; M-Pesa ${code}.`;
-  logActivity({userId:e.user_id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"trainer",action:"class_refund_decision",details});
-  res.json({ok:true});
+  logActivity({userId:e.user_id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"trainer",action:"class_refund_decision",details:`${isFull?"Full":"Partial"} class refund KES ${amount}; M-Pesa ${code}.`});
+  res.json({ok:true,status,amount,confirmationCode:code});
 });
+
 app.put("/api/trainer/classes/:id",requireTrainer,(req,res)=>{
   const current=db.prepare("SELECT * FROM classes WHERE id=?").get(req.params.id);
   if(!current)return res.status(404).json({error:"Course not found."});

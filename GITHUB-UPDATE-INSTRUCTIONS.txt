@@ -1,4 +1,4 @@
-v21.9.12c CLASS REFUND UI HOTFIX
+v21.9.13 CLASS REFUND CLEANUP
 
 Replace:
 - server.js
@@ -6,13 +6,15 @@ Replace:
 - VERSION.txt
 - GITHUB-UPDATE-INSTRUCTIONS.txt
 - public/app.js
+- public/styles.css
 - public/index.html
 
 Do NOT reset the database.
 
 Test:
-1. Open Needs Attention and click Handle refund on the trainer-cancelled class enrolment.
-2. The class opens and the cancelled dog should remain visible under Cancelled enrolments / history.
-3. Full refund / Partial / No refund buttons should be present.
-4. Complete the refund and confirm the Needs Attention item clears.
-5. Confirm the large iPad Pro home alignment remains fixed.
+1. Open a class with several cancelled enrolments: all rows should align to the same left edge.
+2. A refund_pending enrolment should have its action buttons inside its own highlighted row.
+3. Enter 123456abcd as M-Pesa refund reference: it should normalize to 123456ABCD and be accepted if exactly 10 alphanumeric characters.
+4. Enter an invalid code: the flow should keep the decision/amount and show the same code again for correction.
+5. Test Full credit and Partial credit: no M-Pesa code requested, client credit balance increases, Needs Attention clears after decision.
+6. Confirm old refunded/cancelled enrolments remain visible as quiet history rows.

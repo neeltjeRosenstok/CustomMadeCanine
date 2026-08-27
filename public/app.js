@@ -1068,11 +1068,67 @@ function classesAdminView(){
  return `<section class="screen admin-screen"><button class="back-dashboard" onclick="dashboardBack()">← Back to Dashboard</button><div class="admin-head"><div><div class="eyebrow">Amy's workspace</div><h2>Classes</h2><p>Courses, age ranges, dates, places and dogs enrolled.</p></div><button class="secondary" onclick="addClass()">＋ New course</button></div><div class="class-admin-layout"><div class="admin-list class-admin-list">${rows.map(x=>{const n=(x.enrolments||[]).filter(e=>e.enrolment_status==="active").length;return `<button class="admin-list-row class-course-row ${Number(active?.id)===Number(x.id)?"selected":""}" onclick="state.selectedClassAdmin=${x.id};render()"><span class="class-list-main"><span class="class-list-title">${esc(x.title)}</span><small>${displayDate(x.start_date,{day:"numeric",month:"short",year:"numeric"})}</small></span><span class="class-list-enrolled"><span>${n}/${x.capacity}</span><small>enrolled</small></span></button>`}).join('')||'<p>No classes created yet.</p>'}</div><div class="admin-detail">${classAdminDetail(active)}</div></div></section>`;
 }
 function classAdminDetail(c){
- if(!c)return "";const active=(c.enrolments||[]).filter(e=>e.enrolment_status==="active"),cancelled=(c.enrolments||[]).filter(e=>e.enrolment_status!=="active");
- return `<div class="card class-admin-card"><div class="class-detail-head"><div><h3>${esc(c.title)}</h3><p>${esc(classAgeLabel(c))} · ${active.length}/${c.capacity} places taken · ${c.location_type==="alternate"?esc(c.location_name||"Alternate venue"):"Amy's Arena in Ridgeways"}</p></div><div class="actions class-edit-actions"><button class="secondary compact-button" onclick="editClassCourse(${c.id})">Edit course</button><button class="danger compact-button" onclick="deleteClassCourse(${c.id})">Delete course</button></div></div><h4>Sessions</h4><div class="compact-list">${(c.sessions||[]).map(s=>`<div>${displayDate(s.session_date,{weekday:"short",day:"numeric",month:"short",year:"numeric"})} · ${esc(s.start_time)}–${esc(s.end_time)}</div>`).join("")}</div><h4>Dogs taking part</h4>${active.length?`<div class="class-participant-list">${active.map(e=>{const months=ageMonthsOnClient(e.date_of_birth,c.start_date);return `<div class="class-enrollee"><div><span class="class-dog-name">${esc(e.pet_name||"Dog")} · ${esc(e.client_name)}</span><small>${esc(e.breed||"Breed not recorded")} · ${e.date_of_birth?`DOB ${displayDate(e.date_of_birth,{day:"numeric",month:"short",year:"numeric"})}${months!=null?` · ${months} months at start`:""}`:"DOB not recorded"}</small><small>${esc(e.email||"")}${e.phone?` · ${esc(e.phone)}`:""}</small>${e.vaccination_status==="verified"?`<small class="vaccination-verified">Vaccination verified ✓</small>`:""}</div><button class="secondary compact-button" onclick="rejectClassDog(${e.id})">Cancel enrolment</button></div>`}).join("")}</div>`:"<p>No active enrolments yet.</p>"}${cancelled.length?`<h4>Cancelled enrolments / history</h4><div class="compact-list">${cancelled.map(e=>`<div class="class-enrollee rejected-enrollee" data-class-enrolment-id="${e.id}"><div><span>${esc(e.pet_name||"Dog")} · ${esc(e.client_name)}</span><small>${e.enrolment_status==="cancelled_by_client"?`Cancelled by client${e.rejected_reason&&e.rejected_reason!=="Cancelled by client"?` · Client note: ${esc(e.rejected_reason)}`:""}`:e.enrolment_status==="cancelled_by_trainer"?`Cancelled by Amy${e.rejected_reason?` · ${esc(e.rejected_reason)}`:""}`:esc(e.rejected_reason||"Cancelled")} · ${esc(e.payment_status||"")}</small></div>${e.payment_status==="refund_pending"?`<div class="actions"><button class="secondary compact-button" onclick="decideClassRefund(${e.id},'full',${Number(c.price||0)})">Full refund</button><button class="secondary compact-button" onclick="decideClassRefund(${e.id},'partial',${Number(c.price||0)})">Partial</button><button class="secondary compact-button" onclick="decideClassRefund(${e.id},'none',${Number(c.price||0)})">No refund</button></div>`:""}</div>`).join("")}</div>`:""}</div>`;
+ if(!c)return "";
+ const active=(c.enrolments||[]).filter(e=>e.enrolment_status==="active"),
+       cancelled=(c.enrolments||[]).filter(e=>e.enrolment_status!=="active");
+ return `<div class="card class-admin-card"><div class="class-detail-head"><div><h3>${esc(c.title)}</h3><p>${esc(classAgeLabel(c))} · ${active.length}/${c.capacity} places taken · ${c.location_type==="alternate"?esc(c.location_name||"Alternate venue"):"Amy's Arena in Ridgeways"}</p></div><div class="actions class-edit-actions"><button class="secondary compact-button" onclick="editClassCourse(${c.id})">Edit course</button><button class="danger compact-button" onclick="deleteClassCourse(${c.id})">Delete course</button></div></div>
+ <h4>Sessions</h4><div class="compact-list">${(c.sessions||[]).map(s=>`<div>${displayDate(s.session_date,{weekday:"short",day:"numeric",month:"short",year:"numeric"})} · ${esc(s.start_time)}–${esc(s.end_time)}</div>`).join("")}</div>
+ <h4>Dogs taking part</h4>${active.length?`<div class="class-participant-list">${active.map(e=>{const months=ageMonthsOnClient(e.date_of_birth,c.start_date);return `<div class="class-enrollee"><div><span class="class-dog-name">${esc(e.pet_name||"Dog")} · ${esc(e.client_name)}</span><small>${esc(e.breed||"Breed not recorded")} · ${e.date_of_birth?`DOB ${displayDate(e.date_of_birth,{day:"numeric",month:"short",year:"numeric"})}${months!=null?` · ${months} months at start`:""}`:"DOB not recorded"}</small><small>${esc(e.email||"")}${e.phone?` · ${esc(e.phone)}`:""}</small>${e.vaccination_status==="verified"?`<small class="vaccination-verified">Vaccination verified ✓</small>`:""}</div><button class="secondary compact-button" onclick="rejectClassDog(${e.id})">Cancel enrolment</button></div>`}).join("")}</div>`:"<p>No active enrolments yet.</p>"}
+ ${cancelled.length?`<h4>Cancelled enrolments / history</h4><div class="class-cancelled-list">${cancelled.map(e=>`<div class="class-cancelled-row ${e.payment_status==="refund_pending"?"needs-refund":""}" data-class-enrolment-id="${e.id}"><div class="class-cancelled-copy"><span class="class-cancelled-name">${esc(e.pet_name||"Dog")} · ${esc(e.client_name)}</span><small>${e.enrolment_status==="cancelled_by_client"?`Cancelled by client${e.rejected_reason&&e.rejected_reason!=="Cancelled by client"?` · Client note: ${esc(e.rejected_reason)}`:""}`:e.enrolment_status==="cancelled_by_trainer"?`Cancelled by Amy${e.rejected_reason?` · ${esc(e.rejected_reason)}`:""}`:esc(e.rejected_reason||"Cancelled")} · ${esc(e.payment_status||"")}</small></div>${e.payment_status==="refund_pending"?`<div class="class-refund-actions"><button class="secondary compact-button" onclick="decideClassRefund(${e.id},'full',${Number(c.price||0)})">Full refund</button><button class="secondary compact-button" onclick="decideClassRefund(${e.id},'partial',${Number(c.price||0)})">Partial refund</button><button class="secondary compact-button" onclick="decideClassRefund(${e.id},'credit_full',${Number(c.price||0)})">Full credit</button><button class="secondary compact-button" onclick="decideClassRefund(${e.id},'credit_partial',${Number(c.price||0)})">Partial credit</button><button class="secondary compact-button" onclick="decideClassRefund(${e.id},'none',${Number(c.price||0)})">No refund or credit</button></div>`:""}</div>`).join("")}</div>`:""}
+ </div>`;
 }
+
 async function rejectClassDog(id){const reason=await appPrompt("Why is this enrolment being cancelled? The client will see this note.","");if(reason===null)return;if(!reason.trim())return appAlert("Please record a short note for the client.");if(!await appConfirm("Cancel this class enrolment? The place will become available again."))return;try{const d=await api(`/api/trainer/class-enrolments/${id}/reject`,{method:"POST",body:JSON.stringify({reason:reason.trim()})});state.classAdmin=await api("/api/trainer/classes-detail");state.classes=await api("/api/classes");state.trainer=await api("/api/trainer/summary");render();if(d.refundPending)appAlert("Enrolment cancelled. This paid place now needs a refund decision.")}catch(e){appAlert(e.message)}}
-async function decideClassRefund(id,decision,fullAmount){if(decision==="none"){if(!await appConfirm("Record that no refund will be made for this cancelled class enrolment?"))return;try{await api(`/api/trainer/class-enrolments/${id}/refund`,{method:"POST",body:JSON.stringify({decision:"none"})});state.classAdmin=await api("/api/trainer/classes-detail");state.trainer=await api("/api/trainer/summary");render()}catch(e){appAlert(e.message)}return}const amountText=await appPrompt(`${decision==="full"?"Full":"Partial"} refund amount in KES:`,decision==="full"?String(fullAmount||0):"");if(amountText===null)return;const code=await appPrompt("M-Pesa refund / transaction confirmation code:","");if(code===null)return;try{await api(`/api/trainer/class-enrolments/${id}/refund`,{method:"POST",body:JSON.stringify({decision,amount:Number(amountText),code:code.trim()})});state.classAdmin=await api("/api/trainer/classes-detail");state.trainer=await api("/api/trainer/summary");render()}catch(e){appAlert(e.message)}}
+async function decideClassRefund(id,decision,fullAmount){
+ const isCredit=decision==="credit_full"||decision==="credit_partial";
+ const isFull=decision==="full"||decision==="credit_full";
+
+ if(decision==="none"){
+   if(!await appConfirm("Record that no refund or client credit will be given for this cancelled class enrolment?"))return;
+   try{
+     await api(`/api/trainer/class-enrolments/${id}/refund`,{method:"POST",body:JSON.stringify({decision:"none"})});
+     state.classAdmin=await api("/api/trainer/classes-detail");state.trainer=await api("/api/trainer/summary");render();
+   }catch(e){appAlert(e.message)}
+   return;
+ }
+
+ let amount=isFull?Number(fullAmount||0):null;
+ if(!isFull){
+   const entered=await appPrompt(isCredit?"Client credit amount in KES:":"Refund amount in KES:","");
+   if(entered===null)return;
+   amount=Number(entered);
+ }
+ if(!Number.isFinite(amount)||amount<=0)return appAlert("Enter a valid amount.");
+
+ if(isCredit){
+   if(!await appConfirm(`${isFull?"Full":"Partial"} client credit of ${money(amount)} will be added to the client's account. No M-Pesa payment will be made.`,"Add client credit"))return;
+   try{
+     await api(`/api/trainer/class-enrolments/${id}/refund`,{method:"POST",body:JSON.stringify({decision,amount})});
+     state.classAdmin=await api("/api/trainer/classes-detail");state.trainer=await api("/api/trainer/summary");render();
+     await appAlert(`${isFull?"Full":"Partial"} client credit recorded: ${money(amount)}.`);
+   }catch(e){appAlert(e.message)}
+   return;
+ }
+
+ let confirmationCode=state.classRefundDraftCode||"";
+ while(true){
+   const entered=await appPrompt("Enter the full 10-character M-Pesa refund confirmation reference:",confirmationCode,isFull?"Full refund":"Partial refund");
+   if(entered===null)return;
+   confirmationCode=String(entered).replace(/\s+/g,"").toUpperCase();
+   state.classRefundDraftCode=confirmationCode;
+   if(/^[A-Z0-9]{10}$/.test(confirmationCode))break;
+   await appAlert("Enter the full 10-character M-Pesa refund confirmation reference.");
+ }
+ try{
+   await api(`/api/trainer/class-enrolments/${id}/refund`,{method:"POST",body:JSON.stringify({decision,amount,code:confirmationCode})});
+   state.classRefundDraftCode="";
+   state.classAdmin=await api("/api/trainer/classes-detail");state.trainer=await api("/api/trainer/summary");render();
+   await appAlert(`${isFull?"Full":"Partial"} class refund recorded: ${money(amount)} · M-Pesa ${confirmationCode}`);
+ }catch(e){
+   await appAlert(e.message);
+ }
+}
+
 async function setSchedulingDate(value){
  if(!value)return;state.schedulingDate=value;state.trainerSelectedDate=value;
  try{await loadTrainerDayMeta(value)}catch(_e){}render();
