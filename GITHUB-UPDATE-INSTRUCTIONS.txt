@@ -1,4 +1,4 @@
-v21.9.12b CLASS REFUND HOTFIX
+v21.9.12c CLASS REFUND UI HOTFIX
 
 Replace:
 - server.js
@@ -11,9 +11,8 @@ Replace:
 Do NOT reset the database.
 
 Test:
-1. Open Needs Attention now: the already-pending paid class cancellation should be visible if it is non-active and refund_pending.
-2. Amy cancels another paid class enrolment.
-3. Needs Attention should show a Class cancellation item with Handle refund.
-4. Handle refund should open the correct cancelled dog and allow the refund decision immediately.
-5. Complete the decision and confirm the counter/item clears.
-6. Confirm the large iPad Pro home alignment remains fixed.
+1. Open Needs Attention and click Handle refund on the trainer-cancelled class enrolment.
+2. The class opens and the cancelled dog should remain visible under Cancelled enrolments / history.
+3. Full refund / Partial / No refund buttons should be present.
+4. Complete the refund and confirm the Needs Attention item clears.
+5. Confirm the large iPad Pro home alignment remains fixed.

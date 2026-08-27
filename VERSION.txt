@@ -1,11 +1,9 @@
-The Custom Made Canine v21.9.12b ONLINE TEST
+The Custom Made Canine v21.9.12c ONLINE TEST
 
-Tiny class-cancellation refund hotfix:
-- Trainer-initiated class cancellations now use the explicit status cancelled_by_trainer.
-- Needs Attention no longer relies on a fragile list of cancellation statuses: every non-active class enrolment with payment_status=refund_pending is shown.
-- The class refund endpoint uses the same rule, so Amy can handle any cancelled enrolment that is genuinely awaiting a refund decision.
-- Existing older trainer-cancelled records using the legacy rejected status remain compatible.
-- Class history now labels future trainer cancellations as “Cancelled by Amy”.
-- The v21.9.12a large-iPad home alignment fix is preserved.
+Tiny class refund UI hotfix:
+- The class detail/history panel now shows every non-active enrolment, including the new cancelled_by_trainer status.
+- A trainer-cancelled paid dog therefore remains visible under Cancelled enrolments / history with Full refund / Partial / No refund controls.
+- Client class history also treats any non-active class enrolment as inactive, so cancelled_by_trainer behaves consistently.
+- v21.9.12b refund-attention logic and v21.9.12a iPad layout fix are preserved.
 
-No database reset or migration is required.
+No database reset or migration required.
