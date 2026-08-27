@@ -1,22 +1,3 @@
-The Custom Made Canine v21.9.8 ONLINE TEST
+The Custom Made Canine v21.9.9 ONLINE TEST
 
-Focused payment/accounting cleanup after v21.9.7 testing:
-- Client payment screen is STK-first; manual M-Pesa is a fallback on the same screen rather than a separate booking-card payment method.
-- Manual M-Pesa references must be exactly 10 alphanumeric characters; spaces are ignored and references are stored/displayed uppercase.
-- Amy's Needs Attention wording now says M-Pesa Ref.
-- Resume payment returns to the normal STK-first payment screen.
-- Client credit is shown prominently at the top of Bookings and offered during checkout.
-- Apply credit supports full or partial use. If credit exceeds the charge, the unused balance remains on the client account.
-- Full-credit settlement still completes the booking/payment flow; partial credit continues to M-Pesa for the remaining balance.
-- Payment receipt timestamps and M-Pesa receipt references are recorded for new automatic/manual payments.
-- Payments report is accounting-first and sorted by payment received time: Received date/time, Client, Amount, M-Pesa Ref, Status, Refund/Credit, Source, Dog, Reference.
-- Payments report date range is based on payment received/recorded time for new data; older records fall back to their existing created timestamp.
-- Confirm & Pay is centered.
-- Payment success now has one button: Back home, which returns the logged-in client to Client Portal > Bookings.
-- Narrow-screen/iPhone date-input containment is applied globally, including the client private-booking date.
-
-Still deliberately not included:
-- Full class manual-payment recovery.
-- Amy Payment received override (Cash payment received / Complimentary / Other).
-- Client-tab attention badges and PWA notifications/icon work.
-- eTIMS remains end-of-roadmap.
+Correction batch: iPhone emphasis/date height, payment scroll-to-top, cancelled/refund modal cleanup, Close wording, global uppercase M-Pesa refs, 10-char refund validation, preserved manual-code input, human-readable account update, compact Refund/Credit report method, T&C readability styling, and CMC home-screen icons/manifest from the existing logo.

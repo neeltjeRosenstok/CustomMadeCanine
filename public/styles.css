@@ -978,3 +978,8 @@ b,strong{font-weight:500}
     max-width:100%!important;
   }
 }
+
+/* v21.9.9 corrections */
+.booking-summary strong,.booking-summary b,.booking-confirmation strong,.booking-confirmation b,.private-summary strong,.private-summary b,.notice strong,.notice b{font-weight:700!important;-webkit-font-smoothing:auto}
+@media(max-width:560px){#privateDate,.private-date-input,input[type="date"]{min-height:46px!important;height:46px!important;line-height:46px!important;padding-top:0!important;padding-bottom:0!important}}
+.terms-copy{line-height:1.6}.terms-copy p{margin:.65em 0}.terms-copy ul,.terms-copy ol{margin:.7em 0 .9em;padding-left:1.35rem}.terms-copy li{margin:.38em 0}

@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.8-online-test";
+const APP_VERSION = "21.9.9-online-test";
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -1698,7 +1698,7 @@ app.post("/api/trainer/class-enrolments/:id/refund",requireTrainer,(req,res)=>{
     amount=Number(req.body.amount);
     code=String(req.body.code||"").trim();
     if(!Number.isFinite(amount)||amount<=0)return res.status(400).json({error:"Enter the refund amount in KES."});
-    if(!code)return res.status(400).json({error:"Enter the M-Pesa refund/transaction confirmation code."});
+    if(!/^[A-Z0-9]{10}$/.test(code))return res.status(400).json({error:"Enter the full 10-character M-Pesa refund confirmation reference."});
     if(decision==="full"&&amount!==Number(e.price||0))return res.status(400).json({error:`A full refund must equal KES ${Number(e.price||0).toLocaleString()}.`});
     status=decision==="full"?"refunded":"refund_partial";
   }
@@ -1882,8 +1882,8 @@ app.post("/api/trainer/bookings/:id/refund",requireTrainer,(req,res)=>{
  const isCredit=decision.startsWith("credit_"),isFull=decision==="full"||decision==="credit_full",amount=isFull?refundable:Math.round(Number(req.body.amount));
  if(!Number.isFinite(amount)||amount<=0)return res.status(400).json({error:isCredit?"Enter the client credit amount in KES.":"Enter the refund amount in KES."});
  if(amount>refundable)return res.status(400).json({error:`Amount cannot exceed the refundable value of KES ${refundable.toLocaleString()}.`});
- if(isCredit){const status=isFull?"credited":"credit_partial";db.prepare("UPDATE bookings SET payment_status=?,credit_amount=?,refund_amount=NULL,refund_confirmation_code=NULL,refund_recorded_at=CURRENT_TIMESTAMP WHERE id=?").run(status,amount,b.id);const balance=addClientCredit(b.user_id,amount,"booking",b.id,`${isFull?"Full":"Partial"} client credit from cancelled booking ${b.booking_ref}.`);db.prepare("INSERT INTO booking_history(booking_id,actor_role,action,details) VALUES(?,?,?,?)").run(b.id,"trainer","credit_decision",`${isFull?"Full":"Partial"} client credit: KES ${amount}.`);logActivity({userId:b.user_id,petId:b.pet_id,actorUserId:req.user.id,actorRole:"trainer",action:"client_credit_added",details:`KES ${amount} client credit added from cancelled booking ${b.booking_ref}. Balance KES ${balance}.`});return res.json({ok:true,status,amount,creditBalance:balance,refundableAmount:refundable})}
- const code=String(req.body.confirmationCode||"").trim();if(!code)return res.status(400).json({error:"Enter the M-Pesa refund/transaction confirmation code."});
+ if(isCredit){const status=isFull?"credited":"credit_partial";db.prepare("UPDATE bookings SET payment_status=?,credit_amount=?,refund_amount=NULL,refund_confirmation_code=NULL,refund_recorded_at=CURRENT_TIMESTAMP WHERE id=?").run(status,amount,b.id);const balance=addClientCredit(b.user_id,amount,"booking",b.id,`${isFull?"Full":"Partial"} credit for cancelled training ${String(b.start_at||"").slice(0,10)}${String(req.body.note||"").trim()?` — ${String(req.body.note).trim()}`:""}`);db.prepare("INSERT INTO booking_history(booking_id,actor_role,action,details) VALUES(?,?,?,?)").run(b.id,"trainer","credit_decision",`${isFull?"Full":"Partial"} client credit: KES ${amount}.`);logActivity({userId:b.user_id,petId:b.pet_id,actorUserId:req.user.id,actorRole:"trainer",action:"client_credit_added",details:`KES ${amount} client credit added from cancelled booking ${b.booking_ref}. Balance KES ${balance}.`});return res.json({ok:true,status,amount,creditBalance:balance,refundableAmount:refundable})}
+ const code=normalizeMpesaReference(req.body.confirmationCode);if(!/^[A-Z0-9]{10}$/.test(code))return res.status(400).json({error:"Enter the full 10-character M-Pesa refund confirmation reference."});
  const status=isFull?"refunded":"refund_partial";db.prepare("UPDATE bookings SET payment_status=?,refund_amount=?,refund_confirmation_code=?,credit_amount=NULL,refund_recorded_at=CURRENT_TIMESTAMP WHERE id=?").run(status,amount,code,b.id);db.prepare("INSERT INTO booking_history(booking_id,actor_role,action,details) VALUES(?,?,?,?)").run(b.id,"trainer","refund_decision",`${isFull?"Full":"Partial"} refund: KES ${amount}; M-Pesa confirmation ${code}`);res.json({ok:true,status,amount,confirmationCode:code,refundableAmount:refundable});
 });
 function rescheduleBookingInternal(req,res,actor){
@@ -2052,9 +2052,7 @@ app.get("/api/trainer/reports/:type",requireTrainer,(req,res)=>{
              COALESCE(b.mpesa_receipt_number,b.manual_payment_code,'') mpesa_ref,
              b.payment_status status,
              TRIM(
-               CASE WHEN COALESCE(b.refund_amount,0)>0 THEN 'Refund KES '||b.refund_amount||' ' ELSE '' END ||
-               CASE WHEN COALESCE(b.credit_amount,0)>0 THEN 'Credit granted KES '||b.credit_amount||' ' ELSE '' END ||
-               CASE WHEN COALESCE(b.credit_applied,0)>0 THEN 'Credit applied KES '||b.credit_applied ELSE '' END
+               CASE WHEN COALESCE(b.refund_amount,0)>0 THEN 'KES '||b.refund_amount||' / '||COALESCE(NULLIF(b.refund_confirmation_code,''),'Cash') WHEN COALESCE(b.credit_amount,0)>0 THEN 'KES '||b.credit_amount||' / Credit' WHEN COALESCE(b.credit_applied,0)>0 THEN 'KES '||b.credit_applied||' / Credit' ELSE '' END
              ) refund_credit,
              'Private' source,p.name dog,b.booking_ref
       FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id
@@ -2068,7 +2066,7 @@ app.get("/api/trainer/reports/:type",requireTrainer,(req,res)=>{
                   ELSE MAX(COALESCE(bp.package_price,0)-COALESCE(bp.credit_applied,0),0) END amount,
              COALESCE(bp.mpesa_receipt_number,bp.manual_payment_code,'') mpesa_ref,
              bp.payment_status status,
-             CASE WHEN COALESCE(bp.credit_applied,0)>0 THEN 'Credit applied KES '||bp.credit_applied ELSE '' END refund_credit,
+             CASE WHEN COALESCE(bp.credit_applied,0)>0 THEN 'KES '||bp.credit_applied||' / Credit' ELSE '' END refund_credit,
              'Package' source,p.name dog,('PACKAGE-'||bp.id) booking_ref
       FROM booking_packages bp JOIN users u ON u.id=bp.user_id LEFT JOIN pets p ON p.id=bp.pet_id
       WHERE bp.payment_status NOT IN ('pending','cancelled','failed')
@@ -2082,9 +2080,7 @@ app.get("/api/trainer/reports/:type",requireTrainer,(req,res)=>{
              COALESCE(e.mpesa_receipt_number,e.manual_payment_code,'') mpesa_ref,
              e.payment_status status,
              TRIM(
-               CASE WHEN COALESCE(e.refund_amount,0)>0 THEN 'Refund KES '||e.refund_amount||' ' ELSE '' END ||
-               CASE WHEN COALESCE(e.credit_amount,0)>0 THEN 'Credit granted KES '||e.credit_amount||' ' ELSE '' END ||
-               CASE WHEN COALESCE(e.credit_applied,0)>0 THEN 'Credit applied KES '||e.credit_applied ELSE '' END
+               CASE WHEN COALESCE(e.refund_amount,0)>0 THEN 'KES '||e.refund_amount||' / '||COALESCE(NULLIF(e.refund_confirmation_code,''),'Cash') WHEN COALESCE(e.credit_amount,0)>0 THEN 'KES '||e.credit_amount||' / Credit' WHEN COALESCE(e.credit_applied,0)>0 THEN 'KES '||e.credit_applied||' / Credit' ELSE '' END
              ) refund_credit,
              'Class' source,p.name dog,e.booking_ref
       FROM class_enrolments e JOIN users u ON u.id=e.user_id LEFT JOIN pets p ON p.id=e.pet_id JOIN classes c ON c.id=e.class_id
