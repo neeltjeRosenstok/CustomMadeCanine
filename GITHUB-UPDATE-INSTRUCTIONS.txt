@@ -1,4 +1,4 @@
-v21.9.16c TRAINER LOGIN FIX
+v21.9.16d CALENDAR HOTFIX
 
 Replace:
 - server.js
@@ -6,15 +6,17 @@ Replace:
 - VERSION.txt
 - GITHUB-UPDATE-INSTRUCTIONS.txt
 - public/app.js
+- public/styles.css
 - public/index.html
 
 Do NOT reset the database.
 
-Immediate test only:
-1. Hard refresh the deployed app.
-2. Sign in as Amy on desktop.
-3. Confirm Sign in and continue opens Amy's Workspace immediately.
-4. Repeat on Android.
-5. While logged in as Amy, reload the page and confirm it returns to Amy's Workspace.
-
-Only after those five checks pass, resume class/payment testing.
+Immediate test:
+1. Sign in as Amy.
+2. Open the trainer month calendar.
+3. Confirm there is no "overlapsClient is not defined" warning.
+4. Confirm Arena unavailable blocks are visible.
+5. Confirm Home visits unavailable blocks are visible.
+6. Confirm Amy unavailable blocks are visible.
+7. Confirm the legend no longer contains "Available".
+8. Confirm solid blue/green/purple booking markers still look clear.

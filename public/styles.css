@@ -1180,5 +1180,5 @@ input[type="password"]{text-transform:none!important}
 .month-booking-marker.arena{background:#3567a8}.month-booking-marker.home{background:#378458}.month-booking-marker.class{background:#7657a6}
 .month-booking-marker:not(:empty){width:17px;height:17px}
 .month-calendar-legend{display:flex;flex-wrap:wrap;gap:7px 12px;margin:6px 0 10px;font-size:.78rem;align-items:center}
-.month-calendar-legend>span{display:inline-flex;align-items:center;gap:5px}.legend-swatch{width:14px;height:10px;border-radius:3px;border:1px solid rgba(37,33,94,.12)}.legend-swatch.open{background:rgba(255,255,255,.78)}.legend-swatch.arena{background:rgba(221,153,61,.30)}.legend-swatch.home{background:rgba(79,145,91,.26)}.legend-swatch.amy{background:rgba(120,120,130,.27)}
+.month-calendar-legend>span{display:inline-flex;align-items:center;gap:5px}.legend-swatch{width:14px;height:10px;border-radius:3px;border:1px solid rgba(37,33,94,.12)}.legend-swatch.arena{background:rgba(221,153,61,.30)}.legend-swatch.home{background:rgba(79,145,91,.26)}.legend-swatch.amy{background:rgba(120,120,130,.27)}
 .trainer-override-choice{display:flex;align-items:flex-start;gap:9px;margin:12px 0 4px;padding:10px 12px;border:1px solid rgba(37,33,94,.18);border-radius:10px;background:rgba(255,255,255,.48)}.trainer-override-choice input{width:auto;margin-top:3px}

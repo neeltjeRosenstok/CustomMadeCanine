@@ -1,9 +1,11 @@
-The Custom Made Canine v21.9.16c ONLINE TEST
+The Custom Made Canine v21.9.16d ONLINE TEST
 
-Trainer login correction:
-- Fixed the exact navigation bug in trainer sign-in.
-- The app renders pages from state.view, but the trainer login branch was mistakenly setting state.route='trainer'.
-- Trainer login now sets state.view='trainer', matching the rest of the application.
-- v21.9.16b reload protection and class manual-payment status corrections are preserved.
+Calendar hotfix:
+- Restored the missing client-side overlap helper used by trainer month-calendar availability colouring.
+- Arena unavailable, Home visits unavailable and Amy unavailable blocks can now render again.
+- Removed the redundant "Available" item from the calendar legend.
+- Normal/uncoloured calendar cells simply mean available.
+- Solid borderless booking markers remain unchanged.
 
+All v21.9.16c trainer-login fixes and v21.9.16 functional changes are preserved.
 No database reset is required.
