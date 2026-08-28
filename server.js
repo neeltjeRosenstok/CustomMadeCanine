@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.13-online-test";
+const APP_VERSION = "21.9.14-online-test";
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -282,6 +282,34 @@ function ensureClassEnrolmentSchema(){
 }
 ensureClassEnrolmentSchema();
 
+
+db.exec(`CREATE TABLE IF NOT EXISTS class_enrolment_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  enrolment_id INTEGER,
+  class_id INTEGER NOT NULL,
+  user_id INTEGER,
+  pet_id INTEGER,
+  booking_ref TEXT,
+  event_type TEXT NOT NULL,
+  enrolment_status TEXT,
+  payment_status TEXT,
+  amount INTEGER,
+  reference TEXT,
+  note TEXT,
+  actor_role TEXT NOT NULL DEFAULT 'system',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);`);
+db.exec("CREATE INDEX IF NOT EXISTS idx_class_enrolment_events_course_pet ON class_enrolment_events(class_id,pet_id,created_at)");
+
+function logClassEnrolmentEvent(row,eventType,{actorRole="system",amount=null,reference=null,note=""}={}){
+  if(!row)return;
+  try{
+    db.prepare(`INSERT INTO class_enrolment_events(enrolment_id,class_id,user_id,pet_id,booking_ref,event_type,enrolment_status,payment_status,amount,reference,note,actor_role)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(row.id||null,row.class_id,row.user_id||null,row.pet_id||null,row.booking_ref||null,eventType,row.enrolment_status||null,row.payment_status||null,amount,reference,note||"",actorRole);
+  }catch(e){console.error("Class enrolment event write failed:",e.message)}
+}
+
 db.exec(`CREATE TABLE IF NOT EXISTS activity_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -432,7 +460,8 @@ try { db.exec("ALTER TABLE class_enrolments ADD COLUMN rejected_by INTEGER REFER
 try { db.exec("ALTER TABLE class_enrolments ADD COLUMN refund_amount INTEGER"); } catch {}
 try { db.exec("ALTER TABLE class_enrolments ADD COLUMN refund_confirmation_code TEXT"); } catch {}
 try { db.exec("ALTER TABLE class_enrolments ADD COLUMN refund_recorded_at TEXT"); } catch {}
-try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_class_pet ON class_enrolments(class_id,pet_id)"); } catch {}
+try { db.exec("DROP INDEX IF EXISTS uq_class_pet"); } catch {}
+try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_class_pet_active ON class_enrolments(class_id,pet_id) WHERE enrolment_status='active'"); } catch {}
 db.exec(`CREATE TABLE IF NOT EXISTS recurring_blocks (
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  weekdays TEXT NOT NULL,
@@ -1065,6 +1094,8 @@ app.post("/api/my/class-enrolments/:id/cancel",requireAuth,(req,res)=>{
  if(e.enrolment_status!=="active")return res.status(409).json({error:"This class enrolment is already cancelled."});
  const note=String(req.body.note||"").trim();const paid=["paid","demo_paid","credit_paid"].includes(e.payment_status);
  db.prepare("UPDATE class_enrolments SET enrolment_status='cancelled_by_client',rejected_reason=?,rejected_at=CURRENT_TIMESTAMP,rejected_by=?,payment_status=? WHERE id=?").run(note||"Cancelled by client",req.user.id,paid?"refund_pending":"cancelled",e.id);
+ const cancelledRow=db.prepare("SELECT * FROM class_enrolments WHERE id=?").get(e.id);
+ logClassEnrolmentEvent(cancelledRow,"cancelled_by_client",{actorRole:"client",note:note||"Cancelled by client"});
  logActivity({userId:req.user.id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"client",action:"class_cancel_requested",details:`${e.pet_name||"Dog"} cancelled from ${e.title}.${note?` Note: ${note}`:""}${paid?" Refund decision required.":""}`});
  res.json({ok:true,refundPending:paid});
 });
@@ -1086,8 +1117,9 @@ app.post("/api/classes/:id/enrol",requireAuth,(req,res)=>{
   const pet=db.prepare("SELECT id,name,date_of_birth,archived FROM pets WHERE id=? AND user_id=?").get(petId,req.user.id);
   if(!pet) return res.status(400).json({error:"Please select one of your dogs."});
   if(pet.archived) return res.status(409).json({error:`${pet.name} is archived. Restore the dog before joining a class.`});
-  if(db.prepare("SELECT id,enrolment_status FROM class_enrolments WHERE class_id=? AND pet_id=?").get(c.id,petId)) {
-    return res.status(409).json({error:`${pet.name} already has an enrolment record for this course.`});
+  const existingActiveEnrolment=db.prepare("SELECT id FROM class_enrolments WHERE class_id=? AND pet_id=? AND enrolment_status='active'").get(c.id,petId);
+  if(existingActiveEnrolment) {
+    return res.status(409).json({error:`${pet.name} is already enrolled in this course.`});
   }
 
   const minAge=c.min_age_months==null?null:Number(c.min_age_months);
@@ -1113,12 +1145,33 @@ app.post("/api/classes/:id/enrol",requireAuth,(req,res)=>{
 
   const bookingRef=ref("CLS");
   try {
-    db.prepare("INSERT INTO class_enrolments(class_id,user_id,pet_id,booking_ref,payment_status,enrolment_status,hold_expires_at,terms_accepted_at) VALUES(?,?,?,?,?,'active',?,CURRENT_TIMESTAMP)")
-      .run(c.id,req.user.id,petId,bookingRef,"pending",addHoursIso(24));
-    logActivity({userId:req.user.id,petId,classId:c.id,actorUserId:req.user.id,actorRole:"client",action:"class_enrolled",details:`${pet.name} enrolled in ${c.title}.`});
+    const previous=db.prepare("SELECT * FROM class_enrolments WHERE class_id=? AND pet_id=? AND enrolment_status!='active' ORDER BY datetime(COALESCE(refund_recorded_at,rejected_at,payment_received_at,created_at)) DESC,id DESC LIMIT 1").get(c.id,petId);
+    let enrolmentId;
+    if(previous){
+      logClassEnrolmentEvent(previous,"reactivated",{actorRole:"client",note:`Previous cycle preserved before re-enrolment in ${c.title}.`});
+      db.prepare(`UPDATE class_enrolments SET
+        user_id=?,booking_ref=?,payment_status='pending',enrolment_status='active',
+        rejected_reason=NULL,rejected_at=NULL,rejected_by=NULL,
+        refund_amount=NULL,refund_confirmation_code=NULL,refund_recorded_at=NULL,
+        hold_expires_at=?,terms_accepted_at=CURRENT_TIMESTAMP,
+        credit_applied=0,payment_received_at=NULL,mpesa_receipt_number=NULL,
+        manual_payment_code=NULL,manual_payment_amount=NULL,manual_payment_status=NULL
+        WHERE id=?`).run(req.user.id,bookingRef,addHoursIso(24),previous.id);
+      enrolmentId=previous.id;
+    }else{
+      enrolmentId=db.prepare("INSERT INTO class_enrolments(class_id,user_id,pet_id,booking_ref,payment_status,enrolment_status,hold_expires_at,terms_accepted_at) VALUES(?,?,?,?,?,'active',?,CURRENT_TIMESTAMP)")
+        .run(c.id,req.user.id,petId,bookingRef,"pending",addHoursIso(24)).lastInsertRowid;
+    }
+    const current=db.prepare("SELECT * FROM class_enrolments WHERE id=?").get(enrolmentId);
+    logClassEnrolmentEvent(current,previous?"re_enrolled":"enrolled",{actorRole:"client",note:`${pet.name} ${previous?"re-enrolled":"enrolled"} in ${c.title}.`});
+    logActivity({userId:req.user.id,petId,classId:c.id,actorUserId:req.user.id,actorRole:"client",action:previous?"class_re_enrolled":"class_enrolled",details:`${pet.name} ${previous?"re-enrolled":"enrolled"} in ${c.title}.`});
     res.json({bookingRef,amount:c.price,creditAvailable:clientCreditBalance(req.user.id),creditApplied:0,mpesaDemo:true,mpesaMessage:"Trial mode: complete the trial payment to confirm enrolment."});
   } catch(e) {
-    res.status(409).json({error:`${pet.name} already has an enrolment record for this course.`});
+    if(String(e.message||"").includes("uq_class_pet_active")||String(e.message||"").includes("UNIQUE constraint failed: class_enrolments.class_id, class_enrolments.pet_id")){
+      return res.status(409).json({error:`${pet.name} is already enrolled in this course.`});
+    }
+    console.error("Class enrolment insert/reactivation failed:",e);
+    res.status(500).json({error:"The class enrolment could not be created. Please try again."});
   }
 });
 app.post("/api/classes/:ref/demo-pay",requireAuth,(req,res)=>{
@@ -1643,20 +1696,20 @@ app.post("/api/trainer/clients/:id/status",requireTrainer,(req,res)=>{
   res.json({ok:true});
 });
 app.get("/api/trainer/classes-detail",requireTrainer,(req,res)=>{
-  const rows=db.prepare("SELECT * FROM classes ORDER BY start_date DESC").all();
+  const rows=db.prepare("SELECT * FROM classes ORDER BY start_date DESC,title").all();
   const sessionQ=db.prepare("SELECT * FROM class_sessions WHERE class_id=? ORDER BY session_date,start_time");
   const enrolQ=db.prepare(`
-    SELECT e.id,e.payment_status,e.enrolment_status,e.rejected_reason,e.rejected_at,
-           e.refund_amount,e.refund_confirmation_code,e.booking_ref,
-           u.id user_id,u.name client_name,u.email,u.phone,
-           p.id pet_id,p.name pet_name,p.breed,p.date_of_birth,p.archived,p.vaccination_status
+    SELECT e.*,u.name client_name,u.email,COALESCE(u.whatsapp_phone,u.phone) phone,
+           p.name pet_name,p.breed,p.date_of_birth,p.vaccination_status,
+           COALESCE(e.refund_recorded_at,e.rejected_at,e.payment_received_at,e.created_at) activity_at
     FROM class_enrolments e
     JOIN users u ON u.id=e.user_id
     LEFT JOIN pets p ON p.id=e.pet_id
     WHERE e.class_id=?
-    ORDER BY CASE WHEN e.enrolment_status='active' THEN 0 ELSE 1 END,u.name,p.name
+    ORDER BY datetime(COALESCE(e.refund_recorded_at,e.rejected_at,e.payment_received_at,e.created_at)) DESC,e.id DESC
   `);
-  res.json(rows.map(c=>({...c,sessions:sessionQ.all(c.id),enrolments:enrolQ.all(c.id)})));
+  const eventQ=db.prepare("SELECT * FROM class_enrolment_events WHERE class_id=? AND pet_id=? ORDER BY datetime(created_at) DESC,id DESC");
+  res.json(rows.map(c=>({...c,sessions:sessionQ.all(c.id),enrolments:enrolQ.all(c.id).map(e=>({...e,events:e.pet_id?eventQ.all(c.id,e.pet_id):[]}))})));
 });
 
 app.post("/api/trainer/class-enrolments/:id/reject",requireTrainer,(req,res)=>{
@@ -1677,6 +1730,8 @@ app.post("/api/trainer/class-enrolments/:id/reject",requireTrainer,(req,res)=>{
                   payment_status=?
               WHERE id=?`)
     .run(reason,req.user.id,paid?'refund_pending':'cancelled',e.id);
+  const cancelledRow=db.prepare("SELECT * FROM class_enrolments WHERE id=?").get(e.id);
+  logClassEnrolmentEvent(cancelledRow,"cancelled_by_trainer",{actorRole:"trainer",note:reason});
   logActivity({userId:e.user_id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"trainer",action:"class_cancelled_by_trainer",details:`Amy cancelled ${e.pet_name||"Dog"} from ${e.title}. Reason: ${reason}${paid?" Refund decision required.":""}`});
   res.json({ok:true,refundPending:paid});
 });
@@ -1698,6 +1753,8 @@ app.post("/api/trainer/class-enrolments/:id/refund",requireTrainer,(req,res)=>{
   const fullAmount=Number(e.price||0);
   if(decision==="none"){
     db.prepare("UPDATE class_enrolments SET payment_status='no_refund',refund_amount=NULL,refund_confirmation_code=NULL,refund_recorded_at=CURRENT_TIMESTAMP WHERE id=?").run(e.id);
+    const decided=db.prepare("SELECT * FROM class_enrolments WHERE id=?").get(e.id);
+    logClassEnrolmentEvent(decided,"no_refund_or_credit",{actorRole:"trainer",note:"No refund or client credit"});
     logActivity({userId:e.user_id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"trainer",action:"class_refund_decision",details:`No refund or client credit recorded for ${e.pet_name||"dog"} after cancellation from ${e.title}.`});
     return res.json({ok:true,status:"no_refund"});
   }
@@ -1712,6 +1769,8 @@ app.post("/api/trainer/class-enrolments/:id/refund",requireTrainer,(req,res)=>{
     const status=isFull?"credited":"credit_partial";
     db.prepare("UPDATE class_enrolments SET payment_status=?,refund_amount=NULL,refund_confirmation_code=NULL,refund_recorded_at=CURRENT_TIMESTAMP WHERE id=?").run(status,e.id);
     const balance=addClientCredit(e.user_id,amount,"class_enrolment",e.id,`${isFull?"Full":"Partial"} credit for cancelled class ${e.title}`);
+    const decided=db.prepare("SELECT * FROM class_enrolments WHERE id=?").get(e.id);
+    logClassEnrolmentEvent(decided,isFull?"full_credit":"partial_credit",{actorRole:"trainer",amount,note:`Client credit; balance KES ${balance}`});
     logActivity({userId:e.user_id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"trainer",action:"class_credit_decision",details:`${isFull?"Full":"Partial"} client credit KES ${amount} recorded for ${e.pet_name||"dog"} after cancellation from ${e.title}. Balance KES ${balance}.`});
     return res.json({ok:true,status,amount,creditBalance:balance});
   }
@@ -1721,6 +1780,8 @@ app.post("/api/trainer/class-enrolments/:id/refund",requireTrainer,(req,res)=>{
   const status=isFull?"refunded":"refund_partial";
   db.prepare("UPDATE class_enrolments SET payment_status=?,refund_amount=?,refund_confirmation_code=?,refund_recorded_at=CURRENT_TIMESTAMP WHERE id=?")
     .run(status,amount,code,e.id);
+  const decided=db.prepare("SELECT * FROM class_enrolments WHERE id=?").get(e.id);
+  logClassEnrolmentEvent(decided,isFull?"full_refund":"partial_refund",{actorRole:"trainer",amount,reference:code,note:`M-Pesa ${code}`});
   logActivity({userId:e.user_id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"trainer",action:"class_refund_decision",details:`${isFull?"Full":"Partial"} class refund KES ${amount}; M-Pesa ${code}.`});
   res.json({ok:true,status,amount,confirmationCode:code});
 });

@@ -1085,3 +1085,33 @@ b,strong{font-weight:500}
     grid-column:1/-1;
   }
 }
+
+
+/* v21.9.14 strong class dog cards */
+.class-card-group{margin-top:20px}
+.class-card-group-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.class-card-group-head h4{margin:0}
+.class-card-group-head>span{min-width:32px;height:32px;border-radius:999px;display:grid;place-items:center;border:1px solid var(--line);background:var(--white);color:var(--navy)}
+.class-dog-card-list{display:grid;gap:12px}
+.class-dog-card{display:grid;gap:10px;padding:14px;border:1px solid rgba(37,33,94,.18);border-radius:14px;background:rgba(255,255,255,.62)}
+.class-dog-card.active-dog{border-left:5px solid rgba(36,93,72,.8)}
+.class-dog-card.inactive-dog{border-left:5px solid rgba(101,100,122,.45);background:rgba(255,255,255,.38)}
+.class-dog-card.needs-financial{border-color:rgba(37,33,94,.42);background:rgba(255,248,223,.74)}
+.class-dog-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.class-dog-card-head h4,.class-dog-card-head p{margin:0}
+.class-dog-card-head h4{font-size:1.1rem}
+.class-dog-state{flex:0 0 auto;padding:4px 8px;border-radius:999px;font-size:.78rem;border:1px solid var(--line)}
+.class-dog-state.active{background:rgba(36,93,72,.10);color:#245d48}
+.class-dog-state.inactive{background:rgba(101,100,122,.08);color:#53536a}
+.class-dog-info,.class-dog-status-line{display:grid;gap:3px}
+.class-dog-info p,.class-dog-status-line span{margin:0;line-height:1.4}
+.class-dog-status-line{padding-top:8px;border-top:1px solid rgba(37,33,94,.10)}
+.class-dog-actions,.class-refund-actions{display:flex;flex-wrap:wrap;gap:8px}
+.class-dog-history{border-top:1px solid rgba(37,33,94,.10);padding-top:8px}
+.class-dog-history summary{cursor:pointer;color:var(--navy);font-weight:500}
+.class-dog-history p{margin:6px 0;font-size:.88rem;line-height:1.4}
+.inactive-group .class-dog-card:not(.needs-financial){opacity:.82}
+@media(max-width:700px){
+  .class-refund-actions{display:grid;grid-template-columns:1fr 1fr}
+  .class-refund-actions .compact-button:last-child{grid-column:1/-1}
+}

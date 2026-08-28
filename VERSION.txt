@@ -1,12 +1,13 @@
-The Custom Made Canine v21.9.13 ONLINE TEST
+The Custom Made Canine v21.9.14 ONLINE TEST
 
-Focused class refund cleanup:
-- Cancelled class enrolments now use one consistent aligned row layout; historical rows are quieter and refund-pending rows are highlighted.
-- Refund actions stay visually inside the relevant cancelled enrolment row.
-- Class refund choices now match private cancellations: Full refund, Partial refund, Full credit, Partial credit, No refund or credit.
-- Class credits use the existing client credit ledger/balance and do not require an M-Pesa reference.
-- M-Pesa refund references are normalized automatically: spaces removed and lowercase converted to uppercase before validation/storage.
-- Invalid M-Pesa entry preserves the entered reference and keeps Amy inside the same refund flow instead of forcing her to start over.
-- v21.9.12a iPad alignment and v21.9.12b/c class cancellation/refund routing are preserved.
+Class enrolment lifecycle cleanup:
+- Strong individual dog cards grouped into Active dogs and Inactive / history.
+- Each card contains its own dog/client/contact/vaccination/payment/cancellation/refund information and actions.
+- Financial-action highlighting belongs only to the relevant dog card.
+- Cards sort newest relevant activity first within each group.
+- Re-enrolling a cancelled dog reactivates the same enrolment card rather than creating another visible duplicate.
+- Cancellation/refund/credit/re-enrolment events are preserved in expandable dog-card history.
+- Existing duplicate historical records are grouped into one visible dog card where possible.
+- Capacity counts unique active dogs.
 
-No database reset or migration is required.
+No database reset is required. The lifecycle event table is created automatically.
