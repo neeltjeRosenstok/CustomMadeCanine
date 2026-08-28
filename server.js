@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.14-online-test";
+const APP_VERSION = "21.9.15-online-test";
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -1174,6 +1174,39 @@ app.post("/api/classes/:id/enrol",requireAuth,(req,res)=>{
     res.status(500).json({error:"The class enrolment could not be created. Please try again."});
   }
 });
+app.post("/api/my/classes/:ref/resume-payment",requireAuth,(req,res)=>{
+  expireTimedHolds();
+  const e=db.prepare(`
+    SELECT e.*,c.price,c.title,p.name pet_name
+    FROM class_enrolments e
+    JOIN classes c ON c.id=e.class_id
+    LEFT JOIN pets p ON p.id=e.pet_id
+    WHERE e.booking_ref=? AND e.user_id=?
+  `).get(req.params.ref,req.user.id);
+  if(!e||e.enrolment_status!=='active'||e.payment_status!=='pending')return res.status(404).json({error:"This pending class place cannot be resumed."});
+  if(expiryIsPast(e.hold_expires_at))return res.status(409).json({error:"The 24-hour class hold has expired. Please join the course again if a place is still available."});
+  const total=Math.max(0,Number(e.price||0)),used=Math.max(0,Number(e.credit_applied||0)),amount=Math.max(0,total-used),creditAvailable=clientCreditBalance(req.user.id);
+  if(amount<=0){
+    db.prepare("UPDATE class_enrolments SET payment_status='credit_paid',payment_received_at=CURRENT_TIMESTAMP,hold_expires_at=NULL WHERE id=?").run(e.id);
+    return res.json({bookingRef:e.booking_ref,id:e.id,amount:0,creditAvailable,creditApplied:used,settled:true,type:"class"});
+  }
+  res.json({
+    bookingRef:e.booking_ref,
+    id:e.id,
+    amount,
+    holdExpiresAt:e.hold_expires_at,
+    creditAvailable,
+    creditApplied:used,
+    paymentStartRequired:false,
+    mpesaDemo:true,
+    mpesaMessage:"Demo payment mode: complete the trial payment.",
+    type:"class",
+    petId:e.pet_id,
+    classId:e.class_id,
+    title:e.title
+  });
+});
+
 app.post("/api/classes/:ref/demo-pay",requireAuth,(req,res)=>{
   const r=db.prepare("UPDATE class_enrolments SET payment_status='demo_paid',payment_received_at=CURRENT_TIMESTAMP WHERE booking_ref=? AND user_id=? AND payment_status='pending' AND enrolment_status='active'").run(req.params.ref,req.user.id);
   if(!r.changes) return res.status(404).json({error:"Enrolment not found."});

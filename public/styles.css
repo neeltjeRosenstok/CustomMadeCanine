@@ -1115,3 +1115,42 @@ b,strong{font-weight:500}
   .class-refund-actions{display:grid;grid-template-columns:1fr 1fr}
   .class-refund-actions .compact-button:last-child{grid-column:1/-1}
 }
+
+
+/* v21.9.15 focused class/payment stability */
+.class-admin-screen{
+  overflow:visible!important;
+  height:auto!important;
+  min-height:calc(100dvh - 70px)!important;
+}
+.class-admin-screen .class-admin-layout{
+  flex:none!important;
+  min-height:0!important;
+  align-items:start!important;
+  overflow:visible!important;
+}
+.class-admin-screen .admin-detail{
+  overflow:visible!important;
+  min-height:0!important;
+}
+.class-admin-screen .class-admin-card{
+  height:auto!important;
+  max-height:none!important;
+  overflow:visible!important;
+}
+.confirm-pay-actions{
+  display:flex!important;
+  justify-content:center!important;
+  align-items:center!important;
+  width:100%!important;
+}
+.confirm-pay-actions>.primary,
+.confirm-pay-actions>button{
+  margin-inline:auto!important;
+}
+@media(max-width:800px){
+  .confirm-pay-actions>.primary,
+  .confirm-pay-actions>button{
+    width:min(100%,420px)!important;
+  }
+}

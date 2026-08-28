@@ -1,4 +1,4 @@
-v21.9.14 CLASS CARD / LIFECYCLE CLEANUP
+v21.9.15 STABILITY PASS
 
 Replace:
 - server.js
@@ -12,11 +12,10 @@ Replace:
 Do NOT reset the database.
 
 Test:
-1. Open a scheduled course: Active dogs and Inactive / history should be separate.
-2. Each dog has its own card; no card should visually bleed into another.
-3. Cancel a paid dog: its card moves to Inactive / history with refund/credit actions inside that card.
-4. Complete refund/credit: card remains as quieter history.
-5. Re-enrol the same dog: the card moves back to Active instead of making a second visible card.
-6. Expand History on that dog and confirm prior cancellation/refund/credit history remains.
-7. Newest relevant activity should appear first inside each group.
-8. Capacity/enrolled count should use unique active dogs.
+1. Trainer > Scheduled classes: open a course with many cancelled dogs. The entire class panel should contain all dog cards.
+2. Client class booking on iPhone and Android: CONFIRM & PAY should be horizontally centered.
+3. Start a course booking, reach payment, then use browser Back.
+4. Client Portal > Bookings should show Awaiting payment plus Resume payment.
+5. Resume payment should reopen the existing held class payment and Complete trial payment should work.
+6. Confirm re-enrolling a previously cancelled dog still works and no duplicate visible dog card is created.
+7. Do not judge client refresh from this build unless it reproduces again; no polling/sync change was added.
