@@ -1,4 +1,4 @@
-v21.9.15 STABILITY PASS
+v21.9.16 FUNCTIONAL POLISH BATCH
 
 Replace:
 - server.js
@@ -11,11 +11,15 @@ Replace:
 
 Do NOT reset the database.
 
-Test:
-1. Trainer > Scheduled classes: open a course with many cancelled dogs. The entire class panel should contain all dog cards.
-2. Client class booking on iPhone and Android: CONFIRM & PAY should be horizontally centered.
-3. Start a course booking, reach payment, then use browser Back.
-4. Client Portal > Bookings should show Awaiting payment plus Resume payment.
-5. Resume payment should reopen the existing held class payment and Complete trial payment should work.
-6. Confirm re-enrolling a previously cancelled dog still works and no duplicate visible dog card is created.
-7. Do not judge client refresh from this build unless it reproduces again; no polling/sync change was added.
+Suggested tests:
+1. Class signup: button says Add new dog.
+2. New class payment: manual fallback is normal wording and submits a 10-character M-Pesa code; Amy sees it in Needs Attention and can verify/reject it.
+3. Safari/iPhone: password field does not capitalise the first character.
+4. Trainer day diary > open appointment > Assign training resource: choose a resource and confirm it appears in that client’s portal.
+5. Refund/credit banner: recent transactions appear; older than 30 days should not remain pinned at the top.
+6. Scheduled class: session list is a Session / Date / Time table; re-enrolled history says Re-enrolled in course without the technical reactivated line.
+7. Trainer month calendar: morning/afternoon availability shading and solid borderless blue/green/purple markers are clear.
+8. Edit an ongoing course: past dates are disabled and cannot be moved server-side; future dates can still be changed.
+9. Travel: an arena appointment immediately before a home visit should remove home slots until adequate travel time exists; likewise an arena slot after an existing home visit should respect return travel.
+10. Book for Client: tick the one-booking override and confirm planned arena/home restrictions can be overridden, but real bookings/classes/Amy blocks still cannot.
+11. Re-enrolment, Resume payment, custom 2-session trainer package, class refunds/credits and iPad layout should still work.

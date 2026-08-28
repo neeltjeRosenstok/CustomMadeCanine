@@ -1154,3 +1154,31 @@ b,strong{font-weight:500}
     width:min(100%,420px)!important;
   }
 }
+
+
+/* v21.9.16 organised sessions, calendar colours and mobile corrections */
+.class-session-table{display:grid;border:1px solid rgba(37,33,94,.16);border-radius:12px;overflow:hidden;margin:8px 0 16px;background:rgba(255,255,255,.55)}
+.class-session-row{display:grid;grid-template-columns:minmax(68px,.45fr) minmax(180px,1.35fr) minmax(110px,.8fr);gap:10px;align-items:center;padding:9px 12px;border-top:1px solid rgba(37,33,94,.10)}
+.class-session-row:first-child{border-top:0}.class-session-head{background:rgba(37,33,94,.06);font-weight:500}.class-session-row>span:last-child{text-align:right}
+@media(max-width:620px){.class-session-row{grid-template-columns:58px 1fr auto;padding:8px}.class-session-head{font-size:.86rem}.class-session-row>span:last-child{white-space:nowrap}}
+
+/* password entry should never be auto-capitalised by mobile Safari */
+input[type="password"]{text-transform:none!important}
+
+/* Solid booking markers: no outline. */
+.dot,.month-dots .dot,.month-booking-marker{border:0!important;outline:0!important}
+.month-day{position:relative;overflow:hidden;isolation:isolate}
+.month-day-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:100%;height:100%}
+.month-availability-half{position:absolute;left:0;right:0;z-index:0;pointer-events:none}.month-availability-half.am{top:0;height:50%}.month-availability-half.pm{bottom:0;height:50%}
+.month-availability-half.open{background:rgba(255,255,255,.78)}
+.month-availability-half.arena{background:rgba(221,153,61,.30)}
+.month-availability-half.home{background:rgba(79,145,91,.26)}
+.month-availability-half.amy{background:rgba(120,120,130,.27)}
+.month-availability-half.both{background:linear-gradient(90deg,rgba(221,153,61,.30) 0 50%,rgba(79,145,91,.26) 50% 100%)}
+.month-booking-markers{display:flex;align-items:center;justify-content:center;gap:4px;min-height:14px}
+.month-booking-marker{display:inline-grid;place-items:center;width:11px;height:11px;border-radius:50%;font-style:normal;font-size:8px;line-height:1;color:#fff;font-weight:500;box-shadow:none!important}
+.month-booking-marker.arena{background:#3567a8}.month-booking-marker.home{background:#378458}.month-booking-marker.class{background:#7657a6}
+.month-booking-marker:not(:empty){width:17px;height:17px}
+.month-calendar-legend{display:flex;flex-wrap:wrap;gap:7px 12px;margin:6px 0 10px;font-size:.78rem;align-items:center}
+.month-calendar-legend>span{display:inline-flex;align-items:center;gap:5px}.legend-swatch{width:14px;height:10px;border-radius:3px;border:1px solid rgba(37,33,94,.12)}.legend-swatch.open{background:rgba(255,255,255,.78)}.legend-swatch.arena{background:rgba(221,153,61,.30)}.legend-swatch.home{background:rgba(79,145,91,.26)}.legend-swatch.amy{background:rgba(120,120,130,.27)}
+.trainer-override-choice{display:flex;align-items:flex-start;gap:9px;margin:12px 0 4px;padding:10px 12px;border:1px solid rgba(37,33,94,.18);border-radius:10px;background:rgba(255,255,255,.48)}.trainer-override-choice input{width:auto;margin-top:3px}

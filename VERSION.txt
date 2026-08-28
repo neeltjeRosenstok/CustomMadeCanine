@@ -1,12 +1,16 @@
-The Custom Made Canine v21.9.15 ONLINE TEST
+The Custom Made Canine v21.9.16 ONLINE TEST
 
-Focused stability pass:
-- Trainer Scheduled Classes detail now grows naturally with all dog cards; cards no longer fall outside the light class panel onto the darker page background.
-- Class CONFIRM & PAY uses the same centered action layout as private booking, including mobile widths for iPhone and Android.
-- Pending active class enrolments in the Client Portal now show Resume payment.
-- Resume payment returns to the existing held class enrolment/payment flow; it does not create another enrolment.
-- The 24-hour hold and any client credit already applied are preserved.
-- Client portal refresh behaviour is intentionally unchanged in this build because recent iPhone testing showed it updating correctly without a manual refresh.
-- v21.9.14 dog-card lifecycle/re-enrolment behaviour is preserved.
+Functional polish / stability batch:
+- Class booking button now says “Add new dog”.
+- Class payment uses the normal manual M-Pesa fallback; manual class references can be submitted and verified by Amy.
+- Safari password fields disable autocapitalisation/autocorrect/spellcheck.
+- Diary appointment “Assign training resource” now assigns directly to that appointment’s client.
+- Latest refund/credit banner in Client Portal remains prominent for 30 days, then disappears while history remains.
+- Trainer class session dates/times are shown in a compact Session / Date / Time table.
+- Technical “reactivated / previous cycle preserved” history wording is hidden; re-enrolment reads “Re-enrolled in course”.
+- Calendar month view has availability colouring by morning/afternoon plus solid borderless booking markers: blue arena, green home, purple class.
+- Completed class session dates cannot be moved or removed; course time locks after the first completed session. Future dates remain editable.
+- Home visits reserve travel time before and after the appointment, including when the neighbouring booking is at the arena.
+- Amy can opt to override planned arena/home unavailability for one trainer-created booking only. Real bookings, classes, Amy-unavailable time, working hours, recurring blocks and travel protection remain enforced.
 
-No database reset or migration is required.
+No database reset required.
