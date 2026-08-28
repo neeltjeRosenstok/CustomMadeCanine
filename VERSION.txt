@@ -1,16 +1,18 @@
-The Custom Made Canine v21.9.16 ONLINE TEST
+The Custom Made Canine v21.9.16b ONLINE TEST
 
-Functional polish / stability batch:
-- Class booking button now says “Add new dog”.
-- Class payment uses the normal manual M-Pesa fallback; manual class references can be submitted and verified by Amy.
-- Safari password fields disable autocapitalisation/autocorrect/spellcheck.
-- Diary appointment “Assign training resource” now assigns directly to that appointment’s client.
-- Latest refund/credit banner in Client Portal remains prominent for 30 days, then disappears while history remains.
-- Trainer class session dates/times are shown in a compact Session / Date / Time table.
-- Technical “reactivated / previous cycle preserved” history wording is hidden; re-enrolment reads “Re-enrolled in course”.
-- Calendar month view has availability colouring by morning/afternoon plus solid borderless booking markers: blue arena, green home, purple class.
-- Completed class session dates cannot be moved or removed; course time locks after the first completed session. Future dates remain editable.
-- Home visits reserve travel time before and after the appointment, including when the neighbouring booking is at the arena.
-- Amy can opt to override planned arena/home unavailability for one trainer-created booking only. Real bookings, classes, Amy-unavailable time, working hours, recurring blocks and travel protection remain enforced.
+Emergency stability hotfix on top of v21.9.16.
 
-No database reset required.
+Trainer login/reload:
+- Amy's workspace is displayed as soon as the trainer session is recognised.
+- Dashboard data loads independently afterwards, so one slow request cannot leave the page permanently on Loading.
+- The defensive trainer-summary fix from v21.9.16a is preserved.
+
+Class manual payments:
+- After a manual M-Pesa reference is submitted, the Client Portal says it is awaiting Amy's payment verification.
+- It no longer misleadingly presents the class as simply Awaiting payment.
+- Resume payment is hidden while a submitted reference is awaiting verification.
+- A repeated resume attempt gets a clear verification-pending message.
+- Amy's manual-payment notification resolves when she approves or rejects it.
+
+All v21.9.16 functional changes remain in place.
+No database reset is required.

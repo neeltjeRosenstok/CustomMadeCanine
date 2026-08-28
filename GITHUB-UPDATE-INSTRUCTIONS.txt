@@ -1,4 +1,4 @@
-v21.9.16 FUNCTIONAL POLISH BATCH
+v21.9.16b LOGIN + CLASS MANUAL PAYMENT HOTFIX
 
 Replace:
 - server.js
@@ -6,20 +6,16 @@ Replace:
 - VERSION.txt
 - GITHUB-UPDATE-INSTRUCTIONS.txt
 - public/app.js
-- public/styles.css
 - public/index.html
 
 Do NOT reset the database.
 
-Suggested tests:
-1. Class signup: button says Add new dog.
-2. New class payment: manual fallback is normal wording and submits a 10-character M-Pesa code; Amy sees it in Needs Attention and can verify/reject it.
-3. Safari/iPhone: password field does not capitalise the first character.
-4. Trainer day diary > open appointment > Assign training resource: choose a resource and confirm it appears in that client’s portal.
-5. Refund/credit banner: recent transactions appear; older than 30 days should not remain pinned at the top.
-6. Scheduled class: session list is a Session / Date / Time table; re-enrolled history says Re-enrolled in course without the technical reactivated line.
-7. Trainer month calendar: morning/afternoon availability shading and solid borderless blue/green/purple markers are clear.
-8. Edit an ongoing course: past dates are disabled and cannot be moved server-side; future dates can still be changed.
-9. Travel: an arena appointment immediately before a home visit should remove home slots until adequate travel time exists; likewise an arena slot after an existing home visit should respect return travel.
-10. Book for Client: tick the one-booking override and confirm planned arena/home restrictions can be overridden, but real bookings/classes/Amy blocks still cannot.
-11. Re-enrolment, Resume payment, custom 2-session trainer package, class refunds/credits and iPad layout should still work.
+Immediate tests:
+1. Reload while already signed in as Amy on desktop and Android.
+2. Log Amy out and sign in again.
+3. Submit a manual class M-Pesa reference as a client.
+4. Client Portal should show 'M-Pesa reference submitted — awaiting Amy's payment verification.'
+5. Resume payment should not be shown while Amy is verifying it.
+6. Amy approves the manual class payment.
+7. Client should then show the class as paid/confirmed after the portal updates.
+8. Continue the v21.9.16 test list only after these are confirmed.
