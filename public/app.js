@@ -1384,7 +1384,7 @@ async function submitAuth(){
  try{const body={email:document.getElementById('authEmail').value.trim(),password:document.getElementById('authPassword').value};if((state.authMode||'login')==='register'){body.name=document.getElementById('authName').value;body.whatsappPhone=document.getElementById('authWhatsapp').value;body.mpesaPhone=document.getElementById('authMpesa').value;body.newsletterOptIn=!!document.getElementById('authNewsletter').checked}localStorage.setItem('cmc_last_email',body.email);const d=await api(`/api/auth/${(state.authMode||'login')==='register'?'register':'login'}`,{method:'POST',body:JSON.stringify(body)});state.user=d.user;if(state.user.role==='trainer'){
     state.authReturnToBooking=false;state.menu=false;
     // Once authentication succeeds, enter Amy's workspace even if one dashboard data request fails.
-    state.route='trainer';history.replaceState({},'', '#trainer');render();
+    state.view='trainer';history.replaceState({},'', '#trainer');render();
     try{state.trainer=await api('/api/trainer/summary')}catch(err){console.error('Trainer summary load failed:',err);state.trainer=state.trainer||{}}
     try{await loadTrainerCalendar(new Date())}catch(err){console.error('Trainer week calendar load failed:',err)}
     try{await loadTrainerMonth(new Date())}catch(err){console.error('Trainer month calendar load failed:',err)}

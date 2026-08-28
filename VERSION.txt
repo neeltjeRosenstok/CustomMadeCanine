@@ -1,18 +1,9 @@
-The Custom Made Canine v21.9.16b ONLINE TEST
+The Custom Made Canine v21.9.16c ONLINE TEST
 
-Emergency stability hotfix on top of v21.9.16.
+Trainer login correction:
+- Fixed the exact navigation bug in trainer sign-in.
+- The app renders pages from state.view, but the trainer login branch was mistakenly setting state.route='trainer'.
+- Trainer login now sets state.view='trainer', matching the rest of the application.
+- v21.9.16b reload protection and class manual-payment status corrections are preserved.
 
-Trainer login/reload:
-- Amy's workspace is displayed as soon as the trainer session is recognised.
-- Dashboard data loads independently afterwards, so one slow request cannot leave the page permanently on Loading.
-- The defensive trainer-summary fix from v21.9.16a is preserved.
-
-Class manual payments:
-- After a manual M-Pesa reference is submitted, the Client Portal says it is awaiting Amy's payment verification.
-- It no longer misleadingly presents the class as simply Awaiting payment.
-- Resume payment is hidden while a submitted reference is awaiting verification.
-- A repeated resume attempt gets a clear verification-pending message.
-- Amy's manual-payment notification resolves when she approves or rejects it.
-
-All v21.9.16 functional changes remain in place.
 No database reset is required.

@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.16b-online-test";
+const APP_VERSION = "21.9.16c-online-test";
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");

@@ -1,4 +1,4 @@
-v21.9.16b LOGIN + CLASS MANUAL PAYMENT HOTFIX
+v21.9.16c TRAINER LOGIN FIX
 
 Replace:
 - server.js
@@ -10,12 +10,11 @@ Replace:
 
 Do NOT reset the database.
 
-Immediate tests:
-1. Reload while already signed in as Amy on desktop and Android.
-2. Log Amy out and sign in again.
-3. Submit a manual class M-Pesa reference as a client.
-4. Client Portal should show 'M-Pesa reference submitted — awaiting Amy's payment verification.'
-5. Resume payment should not be shown while Amy is verifying it.
-6. Amy approves the manual class payment.
-7. Client should then show the class as paid/confirmed after the portal updates.
-8. Continue the v21.9.16 test list only after these are confirmed.
+Immediate test only:
+1. Hard refresh the deployed app.
+2. Sign in as Amy on desktop.
+3. Confirm Sign in and continue opens Amy's Workspace immediately.
+4. Repeat on Android.
+5. While logged in as Amy, reload the page and confirm it returns to Amy's Workspace.
+
+Only after those five checks pass, resume class/payment testing.
