@@ -1,4 +1,4 @@
-v21.9.16d CALENDAR HOTFIX
+v21.9.16e CALENDAR CLARITY HOTFIX
 
 Replace:
 - server.js
@@ -11,12 +11,17 @@ Replace:
 
 Do NOT reset the database.
 
-Immediate test:
-1. Sign in as Amy.
-2. Open the trainer month calendar.
-3. Confirm there is no "overlapsClient is not defined" warning.
-4. Confirm Arena unavailable blocks are visible.
-5. Confirm Home visits unavailable blocks are visible.
-6. Confirm Amy unavailable blocks are visible.
-7. Confirm the legend no longer contains "Available".
-8. Confirm solid blue/green/purple booking markers still look clear.
+Immediate tests:
+1. October month view: morning Home visits unavailable should be green; afternoon Arena unavailable should be orange.
+2. Lunch should not create a third month colour.
+3. Genuine Amy unavailable should still be grey.
+4. Booking circles remain solid blue/green/purple.
+5. Open a day schedule:
+   - available rows plain
+   - no paired colour bands
+   - arena booking one blue accent
+   - home booking one green accent
+   - class one purple accent
+   - lunch neutral cream
+   - unavailable location shown as text only
+6. Confirm no overlapsClient warning returns.

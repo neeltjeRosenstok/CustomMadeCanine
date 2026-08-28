@@ -1,11 +1,16 @@
-The Custom Made Canine v21.9.16d ONLINE TEST
+The Custom Made Canine v21.9.16e ONLINE TEST
 
-Calendar hotfix:
-- Restored the missing client-side overlap helper used by trainer month-calendar availability colouring.
-- Arena unavailable, Home visits unavailable and Amy unavailable blocks can now render again.
-- Removed the redundant "Available" item from the calendar legend.
-- Normal/uncoloured calendar cells simply mean available.
-- Solid borderless booking markers remain unchanged.
+Calendar clarity hotfix:
+- Month view shows broad AM/PM location planning only.
+- Detailed date blocks such as lunch no longer colour the month.
+- Home visits unavailable = green; arena unavailable = orange; Amy unavailable = grey.
+- Location-specific states take precedence over generic Amy-unavailable colouring.
+- Day schedule no longer shows paired arena/home colour bands on every row.
+- Available time is plain/default.
+- Unavailable location is shown as small text only.
+- Arena booking = blue accent; home booking = green accent; class = purple accent.
+- Lunch is a neutral cream diary item.
+- Genuine blocked/Amy-unavailable time remains muted grey.
 
-All v21.9.16c trainer-login fixes and v21.9.16 functional changes are preserved.
+v21.9.16d overlap fix, trainer-login fix, solid booking circles, re-enrolment and payment recovery are preserved.
 No database reset is required.

@@ -782,22 +782,24 @@ function trainerAgenda(){
   const st=times[i],en=times[i+1];if(st>=en)continue;const startAt=`${datePrefix}${st}:00`,endAt=`${datePrefix}${en}:00`;
   const booking=ev.bookings.find(x=>startAt>=x.start_at&&startAt<x.end_at),buffer=ev.bookings.find(x=>startAt>=x.end_at&&startAt<x.buffer_end_at),cls=ev.classes.find(x=>st>=x.start_time&&st<x.end_time),block=ev.blocks.find(x=>startAt>=x.start_at&&startAt<x.end_at);
   const rec=(meta.recurringBlocks||[]).find(r=>recurringBlockAppliesOnDateClient(r,key)&&st>=r.start_time&&st<r.end_time);const sblock=(meta.scheduleBlocks||[]).find(r=>{const rs=r.all_day?w.start_time:r.start_time,re=r.all_day?w.end_time:r.end_time;return st>=rs&&st<re});
-  let kind="available",title="Available",detail="",id=null;
-  if(booking){kind="booking";title=`${booking.client} · ${booking.pet_name||"Dog"}`;detail=booking.location_type==="home"?(booking.address||"Address not recorded"):"Amy's Arena in Ridgeways";id=booking.id}
+  let kind="available",title="Available",detail="",id=null,locationType="";
+  if(booking){kind="booking";title=`${booking.client} · ${booking.pet_name||"Dog"}`;detail=booking.location_type==="home"?(booking.address||"Address not recorded"):"Amy's Arena in Ridgeways";id=booking.id;locationType=booking.location_type||""}
   else if(buffer){kind="buffer";title=buffer.location_type==="home"?"Travel / buffer":"Buffer";detail=buffer.location_type==="home"&&buffer.address?buffer.address:""}
   else if(cls){kind="class";title=cls.title;detail=`Class · ${cls.enrolled}/${cls.capacity} places · ${cls.location_type==="alternate"?(cls.location_name||"Alternate venue"):"Amy's Arena in Ridgeways"}`;id=cls.id||cls.class_id||cls.title}
   else if(block){kind="block";title=block.reason||"Blocked"}
   else if(sblock&&sblock.target==="amy"){kind="block";title=sblock.reason||"Amy unavailable"}
   else if(rec){kind="block";title=rec.reason||"Recurring block"}
-  const arenaScheduleBlocked=!!(meta.scheduleBlocks||[]).find(r=>["amy","arena"].includes(r.target)&&st>=(r.all_day?w.start_time:r.start_time)&&st<(r.all_day?w.end_time:r.end_time));const homeScheduleBlocked=!!(meta.scheduleBlocks||[]).find(r=>["amy","home"].includes(r.target)&&st>=(r.all_day?w.start_time:r.start_time)&&st<(r.all_day?w.end_time:r.end_time));
+  const arenaScheduleBlocked=!!(meta.scheduleBlocks||[]).find(r=>["amy","arena"].includes(r.target)&&st>=(r.all_day?w.start_time:r.start_time)&&st<(r.all_day?w.end_time:r.end_time));
+  const homeScheduleBlocked=!!(meta.scheduleBlocks||[]).find(r=>["amy","home"].includes(r.target)&&st>=(r.all_day?w.start_time:r.start_time)&&st<(r.all_day?w.end_time:r.end_time));
   const arenaAllowed=temporaryLocationAvailable("arena")&&!arenaScheduleBlocked,homeAllowed=temporaryLocationAvailable("home")&&!homeScheduleBlocked;
   if(kind==="available"&&!arenaAllowed&&!homeAllowed){kind="location-closed";title="No client bookings available"}
-  rows.push({st,en,kind,title,detail,id,arenaAllowed,homeAllowed});
+  const lunch=/\blunch\b/i.test(title);
+  rows.push({st,en,kind,title,detail,id,locationType,arenaAllowed,homeAllowed,lunch});
  }
- // Merge adjacent available/location-closed/buffer/block rows when all visible properties match.
- const merged=[];for(const r of rows){const prev=merged[merged.length-1];if(prev&&prev.kind===r.kind&&prev.title===r.title&&prev.detail===r.detail&&prev.id===r.id&&prev.arenaAllowed===r.arenaAllowed&&prev.homeAllowed===r.homeAllowed&&prev.en===r.st&&["available","location-closed","buffer","block","booking","class"].includes(r.kind))prev.en=r.en;else merged.push({...r})}
- return `<div class="trainer-agenda">${notices.join("")}<div class="agenda-date"><div><div class="eyebrow">Daily agenda</div><h3>${displayDate(key,{weekday:"long",day:"numeric",month:"long"})}</h3></div><span class="agenda-working-hours">${w.start_time}–${w.end_time}</span></div><div class="agenda-timeline">${merged.map(r=>{const bars=`<span class="agenda-location-bars"><i class="agenda-bar arena ${r.arenaAllowed?"open":"closed"}" title="${r.arenaAllowed?"Arena available":"Arena unavailable"}"></i><i class="agenda-bar home ${r.homeAllowed?"open":"closed"}" title="${r.homeAllowed?"Home visits available":"Home visits unavailable"}"></i></span>`;const markers=`<span class="agenda-location-text">${!r.arenaAllowed?"Arena unavailable":""}${!r.arenaAllowed&&!r.homeAllowed?" · ":""}${!r.homeAllowed?"Home visits unavailable":""}</span>`;const body=`<div class="agenda-time">${r.st}–${r.en}</div><div class="agenda-copy"><span class="agenda-title">${esc(r.title)}</span>${r.detail?`<p>${esc(r.detail)}</p>`:""}${markers}</div>`;return r.kind==="booking"?`<button class="agenda-item ${r.kind} clickable-agenda" onclick="openTrainerBooking(${r.id})">${bars}${body}</button>`:`<div class="agenda-item ${r.kind}">${bars}${body}</div>`}).join("")}</div></div>`;
+ const merged=[];for(const r of rows){const prev=merged[merged.length-1];if(prev&&prev.kind===r.kind&&prev.title===r.title&&prev.detail===r.detail&&prev.id===r.id&&prev.locationType===r.locationType&&prev.arenaAllowed===r.arenaAllowed&&prev.homeAllowed===r.homeAllowed&&prev.lunch===r.lunch&&prev.en===r.st&&["available","location-closed","buffer","block","booking","class"].includes(r.kind))prev.en=r.en;else merged.push({...r})}
+ return `<div class="trainer-agenda">${notices.join("")}<div class="agenda-date"><div><div class="eyebrow">Daily agenda</div><h3>${displayDate(key,{weekday:"long",day:"numeric",month:"long"})}</h3></div><span class="agenda-working-hours">${w.start_time}–${w.end_time}</span></div><div class="agenda-timeline">${merged.map(r=>{const availability=(!r.arenaAllowed||!r.homeAllowed)?`<span class="agenda-location-text">${!r.arenaAllowed?"Arena unavailable":""}${!r.arenaAllowed&&!r.homeAllowed?" · ":""}${!r.homeAllowed?"Home visits unavailable":""}</span>`:"";const body=`<div class="agenda-time">${r.st}–${r.en}</div><div class="agenda-copy"><span class="agenda-title">${esc(r.title)}</span>${r.detail?`<p>${esc(r.detail)}</p>`:""}${availability}</div>`;const cls=`agenda-item ${r.kind}${r.kind==="booking"&&r.locationType?` booking-${r.locationType}`:""}${r.lunch?" lunch-item":""}`;return r.kind==="booking"?`<button class="${cls} clickable-agenda" onclick="openTrainerBooking(${r.id})">${body}</button>`:`<div class="${cls}">${body}</div>`}).join("")}</div></div>`;
 }
+
 
 function overlapsClient(aStart,aEnd,bStart,bEnd){
  const toMs=(value)=>{
@@ -815,13 +817,29 @@ function monthEnd(d){const x=new Date(d);return new Date(x.getFullYear(),x.getMo
 function monthCalendarView(){
  const selected=parseDateKey(state.trainerMonthDate)||new Date(),first=monthStart(selected),last=monthEnd(selected),cal=state.trainerMonthCalendar||{bookings:[],classSessions:[],blocks:[],serviceBlocks:[],scheduleBlocks:[]};
  const lead=(first.getDay()+6)%7,days=last.getDate(),cells=[];for(let i=0;i<lead;i++){const col=i%7;cells.push(`<span class="month-empty ${col>=5?"weekend-column":""}"></span>`)}
- const halfState=(key,half)=>{const hs=half==='am'?`${key}T00:00:00`:`${key}T12:00:00`,he=half==='am'?`${key}T12:00:00`:`${key}T23:59:59`;const anyAmy=(cal.blocks||[]).some(b=>overlapsClient(hs,he,b.start_at,b.end_at))||(cal.scheduleBlocks||[]).some(b=>b.target==='amy'&&key>=b.start_date&&key<=b.end_date&&overlapsClient(hs,he,`${key}T${b.all_day?'00:00':(b.start_time||'00:00')}:00`,`${key}T${b.all_day?'23:59':(b.end_time||'23:59')}:59`));if(anyAmy)return 'amy';const restricted=(type)=>{const service=(cal.serviceBlocks||[]).some(b=>b.location_type===type&&overlapsClient(hs,he,b.start_at||`${key}T00:00:00`,b.end_at||`${key}T23:59:59`));const sched=(cal.scheduleBlocks||[]).some(b=>b.target===type&&key>=b.start_date&&key<=b.end_date&&overlapsClient(hs,he,`${key}T${b.all_day?'00:00':(b.start_time||'00:00')}:00`,`${key}T${b.all_day?'23:59':(b.end_time||'23:59')}:59`));return service||sched};const ar=restricted('arena'),ho=restricted('home');return ar&&ho?'both':ar?'arena':ho?'home':'open'};
+ const halfState=(key,half)=>{
+   const hs=half==='am'?`${key}T00:00:00`:`${key}T12:00:00`,he=half==='am'?`${key}T12:00:00`:`${key}T23:59:59`;
+   // Month view is a broad AM/PM planning view: detailed date blocks such as lunch do not colour it.
+   const amy=(cal.scheduleBlocks||[]).some(b=>b.target==='amy'&&key>=b.start_date&&key<=b.end_date&&overlapsClient(hs,he,`${key}T${b.all_day?'00:00':(b.start_time||'00:00')}:00`,`${key}T${b.all_day?'23:59':(b.end_time||'23:59')}:59`));
+   const restricted=(type)=>{
+     const service=(cal.serviceBlocks||[]).some(b=>b.location_type===type&&overlapsClient(hs,he,b.start_at||`${key}T00:00:00`,b.end_at||`${key}T23:59:59`));
+     const sched=(cal.scheduleBlocks||[]).some(b=>b.target===type&&key>=b.start_date&&key<=b.end_date&&overlapsClient(hs,he,`${key}T${b.all_day?'00:00':(b.start_time||'00:00')}:00`,`${key}T${b.all_day?'23:59':(b.end_time||'23:59')}:59`));
+     return service||sched;
+   };
+   const ar=restricted('arena'),ho=restricted('home');
+   if(ar&&ho)return 'both';
+   if(ar)return 'arena';
+   if(ho)return 'home';
+   if(amy)return 'amy';
+   return 'open';
+ };
  for(let day=1;day<=days;day++){
   const d=new Date(first.getFullYear(),first.getMonth(),day,12),key=dateKey(d),dayBookings=(cal.bookings||[]).filter(x=>String(x.start_at).slice(0,10)===key),arenaCount=dayBookings.filter(x=>x.location_type==='arena').length,homeCount=dayBookings.filter(x=>x.location_type==='home').length,classCount=(cal.classSessions||[]).filter(x=>x.session_date===key).length,am=halfState(key,'am'),pm=halfState(key,'pm');
   const gridCol=(lead+day-1)%7;cells.push(`<button class="month-day ${gridCol>=5?"weekend-column ":""}${key===state.trainerSelectedDate?"selected":""}" onclick="selectMonthDate('${key}')"><span class="month-availability-half am ${am}"></span><span class="month-availability-half pm ${pm}"></span><span class="month-day-content"><span class="month-day-number">${day}</span><span class="month-booking-markers">${arenaCount?`<i class="month-booking-marker arena" title="${arenaCount} arena booking${arenaCount===1?'':'s'}">${arenaCount>1?arenaCount:''}</i>`:""}${homeCount?`<i class="month-booking-marker home" title="${homeCount} home visit${homeCount===1?'':'s'}">${homeCount>1?homeCount:''}</i>`:""}${classCount?`<i class="month-booking-marker class" title="${classCount} class session${classCount===1?'':'s'}">${classCount>1?classCount:''}</i>`:""}</span></span></button>`)
  }
  return `<div class="month-calendar"><div class="calendar-head"><button class="secondary compact-button" onclick="moveTrainerMonth(-1)">←</button><span>${first.toLocaleDateString("en-KE",{month:"long",year:"numeric"})}</span><button class="secondary compact-button" onclick="moveTrainerMonth(1)">→</button></div><div class="month-calendar-legend"><span><i class="legend-swatch arena"></i>Arena unavailable</span><span><i class="legend-swatch home"></i>Home visits unavailable</span><span><i class="legend-swatch amy"></i>Amy unavailable</span><span><i class="month-booking-marker arena"></i>Arena booking</span><span><i class="month-booking-marker home"></i>Home visit</span><span><i class="month-booking-marker class"></i>Class</span></div><div class="month-weekdays">${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((x,i)=>`<span class="${i>=5?"weekend-heading":""}">${x}</span>`).join("")}</div><div class="month-grid">${cells.join("")}</div></div>`;
 }
+
 
 async function loadTrainerMonth(date){
  const d=monthStart(date||new Date()), start=dateKey(new Date(d.getFullYear(),d.getMonth(),1,12)), end=dateKey(new Date(d.getFullYear(),d.getMonth()+1,0,12));

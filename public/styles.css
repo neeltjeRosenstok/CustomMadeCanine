@@ -1182,3 +1182,21 @@ input[type="password"]{text-transform:none!important}
 .month-calendar-legend{display:flex;flex-wrap:wrap;gap:7px 12px;margin:6px 0 10px;font-size:.78rem;align-items:center}
 .month-calendar-legend>span{display:inline-flex;align-items:center;gap:5px}.legend-swatch{width:14px;height:10px;border-radius:3px;border:1px solid rgba(37,33,94,.12)}.legend-swatch.arena{background:rgba(221,153,61,.30)}.legend-swatch.home{background:rgba(79,145,91,.26)}.legend-swatch.amy{background:rgba(120,120,130,.27)}
 .trainer-override-choice{display:flex;align-items:flex-start;gap:9px;margin:12px 0 4px;padding:10px 12px;border:1px solid rgba(37,33,94,.18);border-radius:10px;background:rgba(255,255,255,.48)}.trainer-override-choice input{width:auto;margin-top:3px}
+
+
+/* v21.9.16e calendar clarity */
+.trainer-agenda .agenda-location-bars{display:none!important}
+.trainer-agenda .agenda-item{
+  grid-template-columns:78px minmax(0,1fr)!important;
+  padding:9px 12px!important;
+  background:rgba(255,255,255,.62)!important;
+}
+.trainer-agenda .agenda-item.available{border-left:1px solid var(--line)!important}
+.trainer-agenda .agenda-item.booking-arena{border-left:5px solid #3567a8!important}
+.trainer-agenda .agenda-item.booking-home{border-left:5px solid #378458!important}
+.trainer-agenda .agenda-item.class{border-left:5px solid #7657a6!important}
+.trainer-agenda .agenda-item.block{border-left:5px solid rgba(95,95,105,.55)!important;background:rgba(235,233,228,.72)!important}
+.trainer-agenda .agenda-item.lunch-item{border-left:5px solid rgba(181,160,108,.55)!important;background:rgba(247,242,226,.76)!important}
+.trainer-agenda .agenda-item.buffer{border-left:1px solid var(--line)!important;background:rgba(244,241,233,.58)!important}
+.trainer-agenda .agenda-item.location-closed{border-left:5px solid rgba(95,95,105,.45)!important;background:rgba(235,233,228,.62)!important}
+.trainer-agenda .agenda-location-text{display:block;margin-top:4px;font-size:.82rem;color:#27465d}
