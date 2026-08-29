@@ -1244,3 +1244,9 @@ input[type="password"]{text-transform:none!important}
     font-size:1.02rem!important;
   }
 }
+
+
+/* v21.9.16h native course date + signup form resilience */
+.show-password-row{margin:6px 0 10px!important;align-items:center!important;font-size:.95rem}
+.show-password-row input{width:auto!important;min-width:18px!important;min-height:18px!important;margin:0 8px 0 0!important}
+.class-date-field input[type="date"]{width:100%;min-height:46px;font:inherit}

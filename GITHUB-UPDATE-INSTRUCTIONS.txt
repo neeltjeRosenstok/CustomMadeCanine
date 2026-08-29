@@ -1,20 +1,15 @@
-v21.9.16g CLIENT PORTAL BUTTON UI
+v21.9.16h MOBILE DATE + SIGNUP HOTFIX
 
 Replace:
 - server.js
 - package.json
 - VERSION.txt
 - GITHUB-UPDATE-INSTRUCTIONS.txt
+- public/app.js
 - public/styles.css
 - public/index.html
 
-public/app.js is unchanged functionally but included in the full Render package.
-
 Do NOT reset the database.
 
-Check the Client Portal choice screen on:
-- desktop
-- iPhone
-- Android
-
-Log in / Sign up should now be clearly readable and the buttons should be compact enough not to look like giant empty fields.
+Test New Course first date on Android, iPhone and desktop.
+Then test a new-client registration with an intentionally invalid password: all non-password details should remain in place.

@@ -1,10 +1,10 @@
-The Custom Made Canine v21.9.16g ONLINE TEST
+The Custom Made Canine v21.9.16h ONLINE TEST
 
-Small Client Portal entry UI adjustment:
-- Log in / Sign up text is larger and clearer on desktop, iPhone and Android.
-- Supporting text is also larger.
-- Buttons use their space better without appearing as oversized empty fields.
-- Font weight is made consistent across platforms.
+Reliability hotfix:
+- New Course first date is a native date field, fixing dead Android/iPhone picker and detached desktop top-left popup.
+- New-client signup details persist after validation errors.
+- Sign-up does not use the app's remembered login email.
+- Password eye/dot removed and replaced by a persistent Show password checkbox.
+- Password reset gets the same Show password option.
 
-The requested installed-home-screen app short name change from CMC to CMK9 is intentionally deferred until the post-stability code-cleanup pass, as agreed.
-No database reset is required.
+No database reset required.
