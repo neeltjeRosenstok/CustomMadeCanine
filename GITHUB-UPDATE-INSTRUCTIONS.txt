@@ -1,24 +1,20 @@
-v21.9.16f CONSOLIDATED TEST UPDATE
+v21.9.16g CLIENT PORTAL BUTTON UI
 
 Replace:
 - server.js
 - package.json
 - VERSION.txt
 - GITHUB-UPDATE-INSTRUCTIONS.txt
-- public/app.js
 - public/styles.css
 - public/index.html
 
+public/app.js is unchanged functionally but included in the full Render package.
+
 Do NOT reset the database.
 
-Test:
-1. New client: invalid email such as a&b.com must fail immediately.
-2. New/reset password: fewer than 8, no letter, or no number must fail; spaces and symbols must be accepted.
-3. Existing client passwords must still log in.
-4. Course disappears 24 hours before first session; stale page enrol attempt must also fail.
-5. Month calendar: grey only for Amy unavailable; no arena/home restriction backgrounds; booking circles unchanged.
-6. Day agenda: no availability colour bands; lunch shows LUNCH.
-7. Book for client override says "Override arena or home visit unavailability"; success message does not mention override.
-8. Scheduling: active block button says Change; edit/save and Cancel block both work.
-9. Needs attention: Verify payment works for class manual M-Pesa.
-10. Home heading and Client Portal login wording match the new copy.
+Check the Client Portal choice screen on:
+- desktop
+- iPhone
+- Android
+
+Log in / Sign up should now be clearly readable and the buttons should be compact enough not to look like giant empty fields.

@@ -1,20 +1,10 @@
-The Custom Made Canine v21.9.16f ONLINE TEST
+The Custom Made Canine v21.9.16g ONLINE TEST
 
-Changes in this batch:
-- New-client email validation in browser and server.
-- New/reset passwords require 8+ characters with at least one letter and one number; symbols and spaces are permitted.
-- Existing passwords remain valid at login.
-- Public classes disappear 24 hours before the first session and server enrolment enforces the same Nairobi-time cutoff.
-- Trainer month calendar now uses grey only for Amy-unavailable full/half-day periods.
-- Arena/home restriction colouring removed from Amy's month calendar.
-- Arena booking, home visit and class booking circles remain.
-- Daily agenda availability colour bands/status colouring removed.
-- Silent lunch now appears in the daily agenda as LUNCH.
-- Trainer one-booking override wording simplified to "Override arena or home visit unavailability".
-- Provisional booking confirmation no longer mentions the schedule override.
-- Scheduling blocks now use Change; Amy can edit and save or Cancel block.
-- Home heading centred and split: Set your dog up / for life!
-- Client Portal entry copy simplified to PLEASE LOG IN, Log in / Sign up.
-- Class manual payment verification fixed by adding class-aware trainer notifications, including legacy notification resolution.
+Small Client Portal entry UI adjustment:
+- Log in / Sign up text is larger and clearer on desktop, iPhone and Android.
+- Supporting text is also larger.
+- Buttons use their space better without appearing as oversized empty fields.
+- Font weight is made consistent across platforms.
 
+The requested installed-home-screen app short name change from CMC to CMK9 is intentionally deferred until the post-stability code-cleanup pass, as agreed.
 No database reset is required.

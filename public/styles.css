@@ -1208,3 +1208,39 @@ input[type="password"]{text-transform:none!important}
 .auth-choice{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:3px!important}
 .auth-choice strong{font-size:1rem}.auth-choice span{font-size:.84rem}
 .trainer-agenda .agenda-location-bars,.trainer-agenda .agenda-location-text{display:none!important}
+
+
+/* v21.9.16g Client Portal entry buttons */
+.auth-choice-grid{
+  gap:14px!important;
+}
+.auth-choice{
+  min-height:0!important;
+  padding:18px 22px!important;
+  border-radius:16px!important;
+  justify-content:center!important;
+  align-items:flex-start!important;
+  text-align:left!important;
+}
+.auth-choice strong{
+  font-size:1.28rem!important;
+  line-height:1.15!important;
+  font-weight:600!important;
+  color:var(--navy)!important;
+}
+.auth-choice span{
+  font-size:1rem!important;
+  line-height:1.25!important;
+  color:var(--navy)!important;
+}
+@media(max-width:760px){
+  .auth-choice{
+    padding:17px 20px!important;
+  }
+  .auth-choice strong{
+    font-size:1.35rem!important;
+  }
+  .auth-choice span{
+    font-size:1.02rem!important;
+  }
+}
