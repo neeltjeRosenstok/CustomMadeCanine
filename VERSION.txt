@@ -1,10 +1,17 @@
-The Custom Made Canine v21.9.16h ONLINE TEST
+The Custom Made Canine v21.9.16i ONLINE TEST — Batch 1
 
-Reliability hotfix:
-- New Course first date is a native date field, fixing dead Android/iPhone picker and detached desktop top-left popup.
-- New-client signup details persist after validation errors.
-- Sign-up does not use the app's remembered login email.
-- Password eye/dot removed and replaced by a persistent Show password checkbox.
-- Password reset gets the same Show password option.
+Batch 1 changes:
+- Appointment resource assignment now uses a searchable resource picker instead of numbered prompts.
+- Add to calendar uses the native file share sheet where supported (including iPhone), with download fallback.
+- Needs Attention order: reschedules first, refund/cancellation decisions second, payment verification next, new clients and vaccination below.
+- Daily classes use the purple single left band and are clickable shortcuts to Scheduled Classes.
+- No-refund class decisions require a client-facing note.
+- Class edit Activity History records actual session/date/time changes and displays timestamps in Nairobi time.
+- Client search filters the visible client list robustly.
+- Trainer-proposed multi-session packages show Confirm & Pay and Refuse booking.
+- Client financial notices show the latest three updates from the last 30 days, without the 30-day explanatory sentence.
+- Inactive class cards are simplified.
+- Class M-Pesa refund reference uses an uppercase, 10-character alphanumeric field.
 
-No database reset required.
+Travel-buffer and first-available-slot scheduling changes are intentionally left for Batch 2.
+No database reset is required.

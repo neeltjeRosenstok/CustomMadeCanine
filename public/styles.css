@@ -1250,3 +1250,16 @@ input[type="password"]{text-transform:none!important}
 .show-password-row{margin:6px 0 10px!important;align-items:center!important;font-size:.95rem}
 .show-password-row input{width:auto!important;min-width:18px!important;min-height:18px!important;margin:0 8px 0 0!important}
 .class-date-field input[type="date"]{width:100%;min-height:46px;font:inherit}
+
+
+/* v21.9.16i batch 1 */
+.resource-picker-modal{width:min(720px,94vw)!important}
+.quick-resource-list{display:grid;gap:8px;max-height:min(48vh,480px);overflow:auto;margin:10px 0 14px;padding-right:4px}
+.quick-resource-row{display:flex!important;align-items:center!important;gap:12px;padding:12px 14px;border:1px solid rgba(37,33,94,.18);border-radius:12px;background:#fff;cursor:pointer}
+.quick-resource-row input{width:auto!important;min-width:18px!important;margin:0!important}
+.quick-resource-row span{display:flex;flex-direction:column;gap:2px}.quick-resource-row small{font-size:.84rem}
+.account-update-line{margin-top:7px}
+.inactive-class-card{padding:14px 16px!important;opacity:.88}
+.inactive-class-card .actions{display:none!important}
+.trainer-agenda .agenda-item.class,.trainer-agenda button.agenda-item.class{border-left:5px solid #7657a6!important;background:transparent}
+.class-refund-entry{width:min(560px,94vw)!important}

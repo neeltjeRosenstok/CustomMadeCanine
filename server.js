@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.16h-online-test";
+const APP_VERSION = "21.9.16i-online-test";
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -443,6 +443,7 @@ function isFirstAppointmentForDog(petId,bookingId=null){
 }
 
 try { db.exec("ALTER TABLE trainer_notifications ADD COLUMN class_id INTEGER REFERENCES classes(id) ON DELETE SET NULL"); } catch {}
+try { db.exec("ALTER TABLE class_enrolments ADD COLUMN refund_client_note TEXT"); } catch {}
 try { db.exec("ALTER TABLE resources ADD COLUMN category TEXT DEFAULT 'General'"); } catch {}
 try { db.exec("ALTER TABLE resources ADD COLUMN archived INTEGER NOT NULL DEFAULT 0"); } catch {}
 try { db.exec("ALTER TABLE bookings ADD COLUMN status TEXT NOT NULL DEFAULT 'confirmed'"); } catch {}
@@ -1831,11 +1832,13 @@ app.post("/api/trainer/class-enrolments/:id/refund",requireTrainer,(req,res)=>{
 
   const fullAmount=Number(e.price||0);
   if(decision==="none"){
-    db.prepare("UPDATE class_enrolments SET payment_status='no_refund',refund_amount=NULL,refund_confirmation_code=NULL,refund_recorded_at=CURRENT_TIMESTAMP WHERE id=?").run(e.id);
+    const clientNote=String(req.body.note||"").trim();
+    if(!clientNote)return res.status(400).json({error:"Please add a short note explaining the no-refund decision to the client."});
+    db.prepare("UPDATE class_enrolments SET payment_status='no_refund',refund_amount=NULL,refund_confirmation_code=NULL,refund_client_note=?,refund_recorded_at=CURRENT_TIMESTAMP WHERE id=?").run(clientNote,e.id);
     const decided=db.prepare("SELECT * FROM class_enrolments WHERE id=?").get(e.id);
-    logClassEnrolmentEvent(decided,"no_refund_or_credit",{actorRole:"trainer",note:"No refund or client credit"});
-    logActivity({userId:e.user_id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"trainer",action:"class_refund_decision",details:`No refund or client credit recorded for ${e.pet_name||"dog"} after cancellation from ${e.title}.`});
-    return res.json({ok:true,status:"no_refund"});
+    logClassEnrolmentEvent(decided,"no_refund_or_credit",{actorRole:"trainer",note:clientNote});
+    logActivity({userId:e.user_id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"trainer",action:"class_refund_decision",details:`No refund or client credit recorded for ${e.pet_name||"dog"} after cancellation from ${e.title}. Client note: ${clientNote}`});
+    return res.json({ok:true,status:"no_refund",note:clientNote});
   }
 
   const isCredit=decision.startsWith("credit_");
@@ -1904,6 +1907,17 @@ app.put("/api/trainer/classes/:id",requireTrainer,(req,res)=>{
   const cap=Math.max(1,Number(capacity||12));
   const activeCount=db.prepare("SELECT COUNT(*) n FROM class_enrolments WHERE class_id=? AND enrolment_status='active'").get(current.id).n;
   if(cap<activeCount)return res.status(400).json({error:`Capacity cannot be lower than the ${activeCount} active enrolment(s).`});
+  const changeNotes=[];
+  const oldDates=existingSessions.map(x=>x.session_date);
+  for(let i=0;i<Math.max(oldDates.length,dates.length);i++){
+    if(oldDates[i]&&dates[i]&&oldDates[i]!==dates[i])changeNotes.push(`Session ${i+1}: ${oldDates[i]} → ${dates[i]}`);
+    else if(!oldDates[i]&&dates[i])changeNotes.push(`Session ${i+1} added: ${dates[i]}`);
+    else if(oldDates[i]&&!dates[i])changeNotes.push(`Session ${i+1} removed: ${oldDates[i]}`);
+  }
+  if(String(current.title)!==String(title).trim())changeNotes.push(`Course name: ${current.title} → ${String(title).trim()}`);
+  if(String(current.start_time)!==String(startTime)||String(current.end_time)!==String(endTime))changeNotes.push(`Time: ${current.start_time}–${current.end_time} → ${startTime}–${endTime}`);
+  if(Number(current.price||0)!==Number(price||0))changeNotes.push(`Price: KES ${Number(current.price||0)} → KES ${Number(price||0)}`);
+  if(Number(current.capacity||0)!==Number(cap))changeNotes.push(`Places: ${Number(current.capacity||0)} → ${Number(cap)}`);
   db.transaction(()=>{
     db.prepare("UPDATE classes SET title=?,start_date=?,end_date=?,weekday=?,start_time=?,end_time=?,capacity=?,price=?,location_type=?,location_name=?,min_age_months=?,max_age_months=? WHERE id=?")
       .run(String(title).trim(),dates[0],dates[dates.length-1],weekdayName(dates[0]),startTime,endTime,cap,Number(price||0),chosenLocation,chosenLocation==="alternate"?String(locationName).trim():null,minAge,maxAge,current.id);
@@ -1911,7 +1925,7 @@ app.put("/api/trainer/classes/:id",requireTrainer,(req,res)=>{
     const add=db.prepare("INSERT INTO class_sessions(class_id,session_date,start_time,end_time) VALUES(?,?,?,?)");
     for(const d of dates)add.run(current.id,d,startTime,endTime);
   })();
-  logActivity({classId:Number(current.id),actorUserId:req.user.id,actorRole:"trainer",action:"class_edited",details:`Course updated: ${title}; ${dates.length} session(s).`});
+  logActivity({classId:Number(current.id),actorUserId:req.user.id,actorRole:"trainer",action:"class_edited",details:changeNotes.length?changeNotes.join("; "):`Course saved with ${dates.length} session(s); no schedule change.`});
   res.json({ok:true,id:Number(current.id),dates});
 });
 

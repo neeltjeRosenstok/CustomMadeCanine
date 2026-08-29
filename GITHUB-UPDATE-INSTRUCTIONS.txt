@@ -1,4 +1,4 @@
-v21.9.16h MOBILE DATE + SIGNUP HOTFIX
+v21.9.16i BATCH 1
 
 Replace:
 - server.js
@@ -11,5 +11,14 @@ Replace:
 
 Do NOT reset the database.
 
-Test New Course first date on Android, iPhone and desktop.
-Then test a new-client registration with an intentionally invalid password: all non-password details should remain in place.
+Suggested tests:
+1. Open a private appointment > Add resource: search and select from the resource list.
+2. iPhone client booking > Add to calendar: iOS share sheet should open with the .ics file.
+3. Needs Attention ordering.
+4. Daily class: purple left band; tap it to open Scheduled Classes.
+5. Choose No refund or credit: a client note is mandatory.
+6. Edit a future class date: Activity History should describe the old/new date and show Nairobi time.
+7. Clients > search by client name and dog name.
+8. Trainer-created 2-session package: client sees Confirm & Pay and Refuse booking.
+9. Client gets up to 3 recent refund/credit/no-refund updates, each dropping off after 30 days.
+10. Class M-Pesa refund entry uppercases and stops at 10 alphanumeric characters.
