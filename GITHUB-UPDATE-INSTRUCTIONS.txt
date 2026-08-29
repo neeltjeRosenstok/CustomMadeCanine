@@ -1,4 +1,4 @@
-v21.9.16l RESOURCE EDIT + ADD FLOW
+v21.9.16m RESOURCE LIBRARY + COURSE CANCELLATION FIX
 
 Replace:
 - server.js
@@ -6,14 +6,14 @@ Replace:
 - VERSION.txt
 - GITHUB-UPDATE-INSTRUCTIONS.txt
 - public/app.js
-- public/styles.css
 - public/index.html
+
+public/styles.css is unchanged from v21.9.16l; keep the v21.9.16l copy.
 
 Do NOT reset the database.
 
 Focused test:
-1. Add Resource: file/link appears first; no Type field.
-2. Choose a file: filename becomes suggested editable Title.
-3. Edit Title, Category and Description before saving.
-4. Edit an existing resource: same panel style; file/link remains unchanged.
-5. Change category and confirm library reorders by Category > Type > Title.
+1. Training Resource Library should retain the v21.9.16l Edit / Add flow, search, category sorting, Manage panel and removal warnings.
+2. Client Portal > active paid class > Cancel course enrolment.
+3. Confirmation should name the course and explain that all remaining sessions for that enrolment are cancelled.
+4. Confirm cancellation. Client card should become inactive / refund pending as appropriate, and Amy should receive one refund decision for the course enrolment.
