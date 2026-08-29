@@ -1,10 +1,11 @@
-The Custom Made Canine v21.9.16k ONLINE TEST — Training Resource Library polish
+The Custom Made Canine v21.9.16l ONLINE TEST — Resource edit/upload flow
 
-- Added Search Resources to the Training Resources library.
-- Resource list sorts by file type, then title.
-- Resource titles are visually more prominent.
-- Manage opens a proper access panel showing every assigned client with an individual Remove access button.
-- Removing a resource now warns how many clients are affected and names them before removal.
-- Appointment-side searchable resource picker is unchanged.
+- Add Resource now starts with Choose file / External link.
+- Resource type selector is hidden; type is detected automatically.
+- Selecting a file automatically suggests its filename as the editable title.
+- External links also suggest a title when possible.
+- Then: Title, Category, Description.
+- Added Edit to every resource. Edit opens a panel like Add Resource and allows Title, Category and Description changes without replacing the underlying file/link.
+- Library ordering is Category, then Type, then Title so Amy can build groupings such as Level 1 Foundation, Level 2 Novice, Puppy, Recall, etc.
 
 No database reset required.

@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.16k-online-test";
+const APP_VERSION = "21.9.16l-online-test";
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -2037,6 +2037,16 @@ function resourceType(file){const m=file?.mimetype||"";if(m.includes("pdf"))retu
 app.get("/api/trainer/resources",requireTrainer,(req,res)=>res.json(db.prepare("SELECT * FROM resources WHERE archived=0 ORDER BY created_at DESC").all()));
 app.post("/api/trainer/resources",requireTrainer,upload.single("file"),(req,res)=>{let url=req.body.url||"",type=req.body.type||"";if(req.file)type=resourceType(req.file);if(!req.body.title||(!url&&!req.file))return res.status(400).json({error:"Please provide a title and a file or link."});if(!["video","image","pdf","link","audio"].includes(type))type="link";const id=db.prepare("INSERT INTO resources(title,description,type,url,category) VALUES(?,?,?,?,?)").run(req.body.title,req.body.description||"",type,url,req.body.category||"General").lastInsertRowid;if(req.file){url=`/api/trainer/resources/${id}/file`;db.prepare("UPDATE resources SET url=?,description=? WHERE id=?").run(url,`__FILE__${req.file.filename} ${req.body.description||""}`.trim(),id)}res.json(db.prepare("SELECT * FROM resources WHERE id=?").get(id))});
 app.get("/api/trainer/resources/:id/file",requireAuth,(req,res)=>{const r=db.prepare("SELECT * FROM resources WHERE id=?").get(req.params.id);if(!r)return res.status(404).end();if(req.user.role!=="trainer"){const ok=db.prepare(`SELECT 1 FROM resource_access a LEFT JOIN pets p ON p.id=a.pet_id WHERE a.resource_id=? AND (a.user_id=? OR p.user_id=? OR a.class_id IN (SELECT class_id FROM class_enrolments WHERE user_id=? AND enrolment_status='active' AND payment_status IN ('paid','demo_paid'))) LIMIT 1`).get(r.id,req.user.id,req.user.id,req.user.id);if(!ok)return res.status(403).end()}const m=(r.description||"").match(/^__FILE__([^ ]+)/);if(!m)return res.status(404).end();const full=path.join(UPLOAD_DIR,m[1]);if(!fs.existsSync(full))return res.status(404).end();res.sendFile(full)});
+app.put("/api/trainer/resources/:id",requireTrainer,(req,res)=>{
+ const r=db.prepare("SELECT * FROM resources WHERE id=? AND archived=0").get(req.params.id);
+ if(!r)return res.status(404).json({error:"Resource not found."});
+ const title=String(req.body.title||"").trim(),category=String(req.body.category||"General").trim()||"General",cleanDescription=String(req.body.description||"").trim();
+ if(!title)return res.status(400).json({error:"Please add a title."});
+ const fileMarker=(r.description||"").match(/^__FILE__[^ ]+/)?.[0]||"";
+ const description=fileMarker?`${fileMarker}${cleanDescription?` ${cleanDescription}`:""}`:cleanDescription;
+ db.prepare("UPDATE resources SET title=?,category=?,description=? WHERE id=?").run(title,category,description,r.id);
+ res.json(db.prepare("SELECT * FROM resources WHERE id=?").get(r.id));
+});
 app.delete("/api/trainer/resources/:id",requireTrainer,(req,res)=>{db.prepare("UPDATE resources SET archived=1 WHERE id=?").run(req.params.id);res.json({ok:true})});
 app.post("/api/trainer/resources/:id/access",requireTrainer,(req,res)=>{const {userId,note}=req.body;if(!userId)return res.status(400).json({error:"Choose a client."});db.prepare("INSERT INTO resource_access(resource_id,user_id,pet_id,class_id,note) VALUES(?,?,NULL,NULL,?)").run(req.params.id,userId,note||null);const r=db.prepare("SELECT title FROM resources WHERE id=?").get(req.params.id);logActivity({userId:Number(userId),actorUserId:req.user.id,actorRole:'trainer',action:'resource_assigned',details:`Amy shared resource: ${r?.title||'Training resource'}.`});res.json({ok:true})});
 app.get("/api/trainer/resources/:id/access",requireTrainer,(req,res)=>res.json(db.prepare(`SELECT a.*,u.name user_name,p.name pet_name,c.title class_title FROM resource_access a LEFT JOIN users u ON u.id=a.user_id LEFT JOIN pets p ON p.id=a.pet_id LEFT JOIN classes c ON c.id=a.class_id WHERE a.resource_id=?`).all(req.params.id)));

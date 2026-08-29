@@ -1282,3 +1282,10 @@ input[type="password"]{text-transform:none!important}
 .resource-access-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 14px;border:1px solid rgba(37,33,94,.16);border-radius:12px;background:#fff}
 .resource-access-row>div{display:flex;flex-direction:column;gap:3px}
 @media(max-width:640px){.resource-access-row{align-items:flex-start;flex-direction:column}.resource-access-row button{width:100%}}
+
+
+/* v21.9.16l resource editor */
+.resource-editor-modal{width:min(650px,94vw)!important}
+.resource-source-box{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:end;margin-bottom:6px}
+.resource-source-or{padding-bottom:12px;font-weight:600;color:var(--navy)}
+@media(max-width:640px){.resource-source-box{grid-template-columns:1fr}.resource-source-or{text-align:center;padding:0}}

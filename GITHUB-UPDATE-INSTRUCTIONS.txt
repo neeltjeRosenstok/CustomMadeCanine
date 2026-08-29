@@ -1,4 +1,4 @@
-v21.9.16k RESOURCE LIBRARY POLISH
+v21.9.16l RESOURCE EDIT + ADD FLOW
 
 Replace:
 - server.js
@@ -12,8 +12,8 @@ Replace:
 Do NOT reset the database.
 
 Focused test:
-1. Training Resources > search by title, file type, and category.
-2. Confirm resources are sorted by type, then alphabetically by title.
-3. Check titles are easy to scan.
-4. Manage a resource assigned to several clients: use individual Remove access buttons.
-5. Remove a resource: warning should name/count affected clients before confirmation.
+1. Add Resource: file/link appears first; no Type field.
+2. Choose a file: filename becomes suggested editable Title.
+3. Edit Title, Category and Description before saving.
+4. Edit an existing resource: same panel style; file/link remains unchanged.
+5. Change category and confirm library reorders by Category > Type > Title.
