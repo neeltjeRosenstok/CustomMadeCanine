@@ -1,17 +1,14 @@
-The Custom Made Canine v21.9.16i ONLINE TEST — Batch 1
+The Custom Made Canine v21.9.16j ONLINE TEST — Batch 1 corrections
 
-Batch 1 changes:
-- Appointment resource assignment now uses a searchable resource picker instead of numbered prompts.
-- Add to calendar uses the native file share sheet where supported (including iPhone), with download fallback.
-- Needs Attention order: reschedules first, refund/cancellation decisions second, payment verification next, new clients and vaccination below.
-- Daily classes use the purple single left band and are clickable shortcuts to Scheduled Classes.
-- No-refund class decisions require a client-facing note.
-- Class edit Activity History records actual session/date/time changes and displays timestamps in Nairobi time.
-- Client search filters the visible client list robustly.
-- Trainer-proposed multi-session packages show Confirm & Pay and Refuse booking.
-- Client financial notices show the latest three updates from the last 30 days, without the 30-day explanatory sentence.
-- Inactive class cards are simplified.
-- Class M-Pesa refund reference uses an uppercase, 10-character alphanumeric field.
+Corrections from the completed v21.9.16i test:
+- Class cancellation clearly cancels the client's entire course enrolment / remaining sessions, not one class session.
+- Trainer-created multi-session private packages allow individual paid sessions to be rescheduled or cancelled.
+- Resource picker search/filter fixed.
+- Recent Account Updates now come from preserved booking/class history, so later refunds/credits do not overwrite earlier entries. Latest 3 within 30 days are shown.
+- Class No Refund notes appear in Recent Account Updates.
+- Private M-Pesa refund entry uses a live uppercase 10-character alphanumeric field.
+- Calendar actions are suppressed for inactive/cancelled/refunded bookings.
+- Class button reads “Add all classes to calendar”.
+- iPhone calendar action now opens an inline authenticated text/calendar response; desktop/Android keep the working file flow.
 
-Travel-buffer and first-available-slot scheduling changes are intentionally left for Batch 2.
-No database reset is required.
+No database reset required.

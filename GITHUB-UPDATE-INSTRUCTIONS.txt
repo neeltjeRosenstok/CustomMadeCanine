@@ -1,4 +1,4 @@
-v21.9.16i BATCH 1
+v21.9.16j BATCH 1 CORRECTIONS
 
 Replace:
 - server.js
@@ -11,14 +11,13 @@ Replace:
 
 Do NOT reset the database.
 
-Suggested tests:
-1. Open a private appointment > Add resource: search and select from the resource list.
-2. iPhone client booking > Add to calendar: iOS share sheet should open with the .ics file.
-3. Needs Attention ordering.
-4. Daily class: purple left band; tap it to open Scheduled Classes.
-5. Choose No refund or credit: a client note is mandatory.
-6. Edit a future class date: Activity History should describe the old/new date and show Nairobi time.
-7. Clients > search by client name and dog name.
-8. Trainer-created 2-session package: client sees Confirm & Pay and Refuse booking.
-9. Client gets up to 3 recent refund/credit/no-refund updates, each dropping off after 30 days.
-10. Class M-Pesa refund entry uppercases and stops at 10 alphanumeric characters.
+Focused retest:
+1. Resource picker search.
+2. Whole-course cancellation wording/flow.
+3. Individual session Reschedule / Cancel session inside a paid trainer-created package.
+4. Refund → credit → refund: Latest 3 account updates remain visible.
+5. No-refund class note appears in Recent Account Updates.
+6. Private partial M-Pesa refund live input filtering/capitalisation.
+7. Inactive cards have no calendar button.
+8. “Add all classes to calendar” wording.
+9. iPhone Add to calendar; desktop/Android should remain working.

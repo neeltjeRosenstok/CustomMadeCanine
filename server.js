@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.16i-online-test";
+const APP_VERSION = "21.9.16j-online-test";
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -1116,8 +1116,52 @@ app.get("/api/my/bookings",requireAuth,(req,res)=>{
     WHERE e.user_id=? ORDER BY c.start_date`).all(req.user.id);
   const packages=db.prepare("SELECT bp.*,p.name pet_name,(SELECT COUNT(*) FROM bookings b WHERE b.package_id=bp.id) session_count FROM booking_packages bp LEFT JOIN pets p ON p.id=bp.pet_id WHERE bp.user_id=? ORDER BY bp.created_at DESC").all(req.user.id);
   const rescheduleRequests=db.prepare("SELECT rr.*,b.booking_ref FROM reschedule_requests rr JOIN bookings b ON b.id=rr.booking_id WHERE rr.user_id=? ORDER BY rr.created_at DESC").all(req.user.id);
-  res.json({privateBookings,classBookings,packages,rescheduleRequests});
+  const privateUpdates=db.prepare(`
+    SELECT h.created_at,h.action,h.details,b.id item_id,b.booking_ref,b.start_at
+    FROM booking_history h JOIN bookings b ON b.id=h.booking_id
+    WHERE b.user_id=? AND h.action IN ('refund_decision','credit_decision') AND datetime(h.created_at)>=datetime('now','-30 days')
+    ORDER BY h.created_at DESC,h.id DESC
+  `).all(req.user.id).map(x=>({...x,source:"private"}));
+  const classUpdates=db.prepare(`
+    SELECT ev.created_at,ev.event_type action,ev.note details,ev.amount,ev.reference,ev.class_id item_id,c.title
+    FROM class_enrolment_events ev LEFT JOIN classes c ON c.id=ev.class_id
+    WHERE ev.user_id=? AND ev.event_type IN ('full_refund','partial_refund','full_credit','partial_credit','no_refund_or_credit')
+      AND datetime(ev.created_at)>=datetime('now','-30 days')
+    ORDER BY ev.created_at DESC,ev.id DESC
+  `).all(req.user.id).map(x=>({...x,source:"class"}));
+  const accountUpdates=[...privateUpdates,...classUpdates].sort((x,y)=>String(y.created_at).localeCompare(String(x.created_at))).slice(0,3);
+  res.json({privateBookings,classBookings,packages,rescheduleRequests,accountUpdates});
 });
+
+function serverIcsEscape(value){return String(value||"").replace(/\\/g,"\\\\").replace(/\r?\n/g,"\\n").replace(/,/g,"\\,").replace(/;/g,"\\;")}
+function serverIcsUtc(value){
+ const ms=wallClockMs(String(value||"").replace(/[+-]\d\d:\d\d$/,""));
+ return new Date(ms-3*60*60*1000).toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,"Z");
+}
+function serverIcsDocument(events){
+ const now=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,"Z");
+ const lines=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//The Custom Made Canine//Nairobi//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH"];
+ for(const e of events)lines.push("BEGIN:VEVENT",`UID:${serverIcsEscape(e.uid)}`,`DTSTAMP:${now}`,`DTSTART:${serverIcsUtc(e.start)}`,`DTEND:${serverIcsUtc(e.end)}`,`SUMMARY:${serverIcsEscape(e.title)}`,`LOCATION:${serverIcsEscape(e.location)}`,`DESCRIPTION:${serverIcsEscape(e.description||"")}`,"END:VEVENT");
+ lines.push("END:VCALENDAR");return lines.join("\r\n")+"\r\n";
+}
+app.get("/api/my/calendar/private/:ref.ics",requireAuth,(req,res)=>{
+ const b=db.prepare("SELECT * FROM bookings WHERE booking_ref=? AND user_id=?").get(req.params.ref,req.user.id);
+ if(!b)return res.status(404).send("Booking not found.");
+ const title=b.service==="consultation"?"Initial consultation":b.service==="extra"?"Training + extra time":"Private training";
+ const location=b.location_type==="home"?(b.address||"Client home, Nairobi"):"Amy's Arena, Ridgeways, Nairobi, Kenya";
+ const text=serverIcsDocument([{uid:`${b.booking_ref}@custommadecanine`,start:b.start_at,end:b.end_at,title:`${title} — The Custom Made Canine`,location,description:`Booking reference: ${b.booking_ref}`}]);
+ res.setHeader("Content-Type","text/calendar; charset=utf-8");res.setHeader("Content-Disposition",`inline; filename="custom-made-canine-${b.booking_ref}.ics"`);res.send(text);
+});
+app.get("/api/my/calendar/class/:ref.ics",requireAuth,(req,res)=>{
+ const e=db.prepare("SELECT e.*,c.title,c.id class_id,c.location_type,c.location_name FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.booking_ref=? AND e.user_id=?").get(req.params.ref,req.user.id);
+ if(!e)return res.status(404).send("Class booking not found.");
+ const sessions=db.prepare("SELECT * FROM class_sessions WHERE class_id=? ORDER BY session_date,start_time").all(e.class_id);
+ const location=e.location_type==="alternate"?(e.location_name||"Class venue"):"Amy's Arena, Ridgeways, Nairobi, Kenya";
+ const events=sessions.map((x,i)=>({uid:`${e.class_id}-${i}-${e.booking_ref}@custommadecanine`,start:isoDateTime(x.session_date,x.start_time),end:isoDateTime(x.session_date,x.end_time),title:`${e.title} — Class ${i+1}`,location,description:`Course booking reference: ${e.booking_ref}`}));
+ const text=serverIcsDocument(events);
+ res.setHeader("Content-Type","text/calendar; charset=utf-8");res.setHeader("Content-Disposition",`inline; filename="custom-made-canine-${e.booking_ref}.ics"`);res.send(text);
+});
+
 app.post("/api/my/bookings/:id/reschedule",requireAuth,(req,res)=>createClientRescheduleRequest(req,res));
 app.post("/api/my/bookings/:id/cancel",requireAuth,(req,res)=>cancelBookingInternal(req,res,"client"));
 app.post("/api/my/class-enrolments/:id/cancel",requireAuth,(req,res)=>{

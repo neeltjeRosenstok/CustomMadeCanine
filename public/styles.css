@@ -1263,3 +1263,9 @@ input[type="password"]{text-transform:none!important}
 .inactive-class-card .actions{display:none!important}
 .trainer-agenda .agenda-item.class,.trainer-agenda button.agenda-item.class{border-left:5px solid #7657a6!important;background:transparent}
 .class-refund-entry{width:min(560px,94vw)!important}
+
+.quick-resource-row[hidden]{display:none!important}
+
+.package-session-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid rgba(37,33,94,.10)}
+.package-session-actions{display:flex;gap:7px;flex-wrap:wrap}
+@media(max-width:640px){.package-session-row{align-items:flex-start;flex-direction:column}.package-session-actions{width:100%}}
