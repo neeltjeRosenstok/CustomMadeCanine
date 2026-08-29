@@ -1200,3 +1200,11 @@ input[type="password"]{text-transform:none!important}
 .trainer-agenda .agenda-item.buffer{border-left:1px solid var(--line)!important;background:rgba(244,241,233,.58)!important}
 .trainer-agenda .agenda-item.location-closed{border-left:5px solid rgba(95,95,105,.45)!important;background:rgba(235,233,228,.62)!important}
 .trainer-agenda .agenda-location-text{display:block;margin-top:4px;font-size:.82rem;color:#27465d}
+
+
+/* v21.9.16f simplification and auth clarity */
+.home-main-title{text-align:center!important}
+.password-rule{margin:4px 0 12px;color:var(--navy);font-size:.9rem;line-height:1.35}
+.auth-choice{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:3px!important}
+.auth-choice strong{font-size:1rem}.auth-choice span{font-size:.84rem}
+.trainer-agenda .agenda-location-bars,.trainer-agenda .agenda-location-text{display:none!important}

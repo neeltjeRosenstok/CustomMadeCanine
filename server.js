@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.16e-online-test";
+const APP_VERSION = "21.9.16f-online-test";
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -329,8 +329,8 @@ function logActivity({userId=null,petId=null,classId=null,actorUserId=null,actor
   }catch(e){ console.error("Activity history write failed:",e.message); }
 }
 
-function notifyTrainer({userId=null,petId=null,bookingId=null,kind,message}){
-  try{db.prepare("INSERT INTO trainer_notifications(user_id,pet_id,booking_id,kind,message) VALUES(?,?,?,?,?)").run(userId,petId,bookingId,kind,String(message||""));}catch(e){console.error("Notification write failed:",e.message)}
+function notifyTrainer({userId=null,petId=null,bookingId=null,classId=null,kind,message}){
+  try{db.prepare("INSERT INTO trainer_notifications(user_id,pet_id,booking_id,class_id,kind,message) VALUES(?,?,?,?,?,?)").run(userId,petId,bookingId,classId,kind,String(message||""));}catch(e){console.error("Notification write failed:",e.message)}
 }
 function addHoursIso(hours){return new Date(Date.now()+hours*3600000).toISOString()}
 function expiryIsPast(value){return !!value && new Date(String(value).replace(" ","T")+(/Z$|[+-]\d\d:\d\d$/.test(String(value))?"":"Z")).getTime()<=Date.now()}
@@ -399,6 +399,16 @@ function addClientCredit(userId,amount,sourceType,sourceId,note){
  return clientCreditBalance(userId);
 }
 
+function validClientEmail(value){
+ const email=String(value||"").trim();
+ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+function validNewPassword(value){
+ const password=String(value??"");
+ return password.length>=8 && /[A-Za-z]/.test(password) && /\d/.test(password);
+}
+const PASSWORD_RULE="Please use 8 characters, including at least one letter and one number. Symbols and spaces are permitted.";
+
 function normalizeMpesaReference(value){
  return String(value||"").replace(/\s+/g,"").toUpperCase();
 }
@@ -432,6 +442,7 @@ function isFirstAppointmentForDog(petId,bookingId=null){
  if(!petId)return false; const rows=db.prepare("SELECT id,start_at FROM bookings WHERE pet_id=? AND status='confirmed' AND payment_status IN ('paid','demo_paid') ORDER BY start_at,id").all(petId); if(!rows.length)return true; return bookingId?Number(rows[0].id)===Number(bookingId):false;
 }
 
+try { db.exec("ALTER TABLE trainer_notifications ADD COLUMN class_id INTEGER REFERENCES classes(id) ON DELETE SET NULL"); } catch {}
 try { db.exec("ALTER TABLE resources ADD COLUMN category TEXT DEFAULT 'General'"); } catch {}
 try { db.exec("ALTER TABLE resources ADD COLUMN archived INTEGER NOT NULL DEFAULT 0"); } catch {}
 try { db.exec("ALTER TABLE bookings ADD COLUMN status TEXT NOT NULL DEFAULT 'confirmed'"); } catch {}
@@ -792,7 +803,8 @@ app.post("/api/auth/register", (req,res)=>{
  const {name,email,whatsappPhone,mpesaPhone,password,newsletterOptIn}=req.body;
  const whats=String(whatsappPhone||"").trim(),mpesa=String(mpesaPhone||"").trim()||whats,cleanEmail=String(email||"").trim().toLowerCase();
  if(!name||!cleanEmail||!whats||!password)return res.status(400).json({error:"Please complete name, WhatsApp number, email and password."});
- if(password.length<6)return res.status(400).json({error:"Password must be at least 6 characters."});
+ if(!validClientEmail(cleanEmail))return res.status(400).json({error:"Please enter a valid email address."});
+ if(!validNewPassword(password))return res.status(400).json({error:PASSWORD_RULE});
  if(db.prepare("SELECT id FROM users WHERE email=?").get(cleanEmail))return res.status(409).json({error:"That email is already registered. Please sign in instead.",code:"EMAIL_EXISTS"});
  let id=null;
  try{
@@ -843,7 +855,7 @@ app.post("/api/auth/reset-password",(req,res)=>{
   const token=String(req.body.resetCode||"").trim();
   const next=String(req.body.newPassword||"");
   if(!email||!token||!next) return res.status(400).json({error:"Please complete all fields."});
-  if(next.length<6) return res.status(400).json({error:"New password must be at least 6 characters."});
+  if(!validNewPassword(next)) return res.status(400).json({error:PASSWORD_RULE});
   const u=db.prepare("SELECT id FROM users WHERE email=? AND role='client'").get(email);
   if(!u) return res.status(400).json({error:"The reset details are not valid."});
   const hash=crypto.createHash("sha256").update(token).digest("hex");
@@ -857,11 +869,19 @@ app.get("/api/auth/me",(req,res)=>res.json({user:currentUser(req)}));
 
 // Public
 app.get("/api/classes",(req,res)=>{
+  const cutoff=wallClockMs(nairobiWallNowIso())+24*60*60*1000;
   const rows=db.prepare(`
     SELECT c.*,
       (SELECT COUNT(*) FROM class_enrolments e WHERE e.class_id=c.id AND e.enrolment_status='active' AND e.payment_status IN ('pending','paid','demo_paid','credit_paid')) enrolled
-    FROM classes c ORDER BY c.start_date,c.start_time
-  `).all().map(c=>({...c,remaining:Math.max(0,c.capacity-c.enrolled),sessions:db.prepare("SELECT * FROM class_sessions WHERE class_id=? ORDER BY session_date").all(c.id)}));
+    FROM classes c
+    WHERE c.status='open'
+    ORDER BY c.start_date,c.start_time
+  `).all().map(c=>({...c,remaining:Math.max(0,c.capacity-c.enrolled),sessions:db.prepare("SELECT * FROM class_sessions WHERE class_id=? ORDER BY session_date,start_time").all(c.id)}))
+    .filter(c=>{
+      const first=c.sessions?.[0];
+      if(!first)return false;
+      return wallClockMs(isoDateTime(first.session_date,first.start_time))>cutoff;
+    });
   res.json(rows);
 });
 app.get("/api/day-status",(req,res)=>{
@@ -1121,7 +1141,11 @@ app.post("/api/classes/:id/enrol",requireAuth,(req,res)=>{
   if(count>=c.capacity) return res.status(409).json({error:"This class is full."});
   const firstSession=db.prepare("SELECT session_date FROM class_sessions WHERE class_id=? ORDER BY session_date LIMIT 1").get(c.id);
   if(!firstSession) return res.status(400).json({error:"Class schedule is incomplete."});
-  if(new Date(firstSession.session_date+"T23:59:59") < new Date()) return res.status(400).json({error:"This course has already started."});
+  const firstSessionFull=db.prepare("SELECT session_date,start_time FROM class_sessions WHERE class_id=? ORDER BY session_date,start_time LIMIT 1").get(c.id);
+  if(!firstSessionFull)return res.status(400).json({error:"Class schedule is incomplete."});
+  const classStarts=wallClockMs(isoDateTime(firstSessionFull.session_date,firstSessionFull.start_time));
+  const enrolmentCutoff=wallClockMs(nairobiWallNowIso())+24*60*60*1000;
+  if(classStarts<=enrolmentCutoff)return res.status(409).json({error:"Online enrolment for this course has closed. Please contact Amy if you need help."});
 
   const petId=Number(req.body.petId);
   if(!petId) return res.status(400).json({error:"Please select which dog this class is for."});
@@ -1507,7 +1531,7 @@ app.get("/api/trainer/summary",requireTrainer,(req,res)=>{
 });
 app.get("/api/trainer/schedule-blocks",requireTrainer,(req,res)=>res.json(activeScheduleBlocks()));
 app.post("/api/trainer/schedule-blocks",requireTrainer,(req,res)=>{
- const target=String(req.body.target||""),startDate=String(req.body.startDate||""),endDate=String(req.body.endDate||startDate),allDay=!!req.body.allDay,allowExisting=!!req.body.allowExisting,silentCalendar=!!req.body.silentCalendar;
+ const blockId=Number(req.body.id||0),target=String(req.body.target||""),startDate=String(req.body.startDate||""),endDate=String(req.body.endDate||startDate),allDay=!!req.body.allDay,allowExisting=!!req.body.allowExisting,silentCalendar=!!req.body.silentCalendar;
  const startTime=String(req.body.startTime||""),endTime=String(req.body.endTime||""),reason=String(req.body.reason||"Unavailable").trim()||"Unavailable",publicMessage=String(req.body.publicMessage||reason).trim()||reason;
  if(!["amy","arena","home"].includes(target))return res.status(400).json({error:"Choose what is being blocked: Amy, arena or home visits."});
  if(!/^\d{4}-\d{2}-\d{2}$/.test(startDate)||!/^\d{4}-\d{2}-\d{2}$/.test(endDate)||endDate<startDate)return res.status(400).json({error:"Choose a valid first and last date."});
@@ -1526,7 +1550,16 @@ app.post("/api/trainer/schedule-blocks",requireTrainer,(req,res)=>{
  }
  if(days>=367)return res.status(400).json({error:"Please keep one block to 366 days or fewer."});
  if(!allowExisting&&(conflicts.length||classConflicts.length))return res.status(409).json({error:"This block conflicts with an existing booking or class. Reschedule the affected item first.",conflicts,classConflicts});
- const id=db.prepare("INSERT INTO schedule_blocks(target,start_date,end_date,start_time,end_time,all_day,reason,public_message,silent_calendar,active) VALUES(?,?,?,?,?,?,?,?,?,1)").run(target,startDate,endDate,allDay?null:startTime,allDay?null:endTime,allDay?1:0,reason,publicMessage,silentCalendar?1:0).lastInsertRowid;
+ let id=blockId;
+ if(blockId){
+   const current=db.prepare("SELECT id FROM schedule_blocks WHERE id=? AND active=1").get(blockId);
+   if(!current)return res.status(404).json({error:"This block is no longer active."});
+   db.prepare("UPDATE schedule_blocks SET target=?,start_date=?,end_date=?,start_time=?,end_time=?,all_day=?,reason=?,public_message=?,silent_calendar=? WHERE id=?")
+     .run(target,startDate,endDate,allDay?null:startTime,allDay?null:endTime,allDay?1:0,reason,publicMessage,silentCalendar?1:0,blockId);
+ }else{
+   id=db.prepare("INSERT INTO schedule_blocks(target,start_date,end_date,start_time,end_time,all_day,reason,public_message,silent_calendar,active) VALUES(?,?,?,?,?,?,?,?,?,1)")
+     .run(target,startDate,endDate,allDay?null:startTime,allDay?null:endTime,allDay?1:0,reason,publicMessage,silentCalendar?1:0).lastInsertRowid;
+ }
  res.json({ok:true,id});
 });
 function COALESCE_CLASS_ARENA(x){return !x.location_type||x.location_type==="arena"}
@@ -1618,7 +1651,7 @@ app.get("/api/trainer/day-meta",requireTrainer,(req,res)=>{
   const date=String(req.query.date||"");if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return res.status(400).json({error:"Choose a date."});
   const restrictions={};for(const type of ["arena","home"]){const b=serviceBlockForDate(type,date);restrictions[type]=b?{available:false,id:b.id,public_message:b.public_message||b.reason||"Temporarily unavailable",private_note:b.private_note||"",untilFurther:!b.end_at}:{available:true};}
   const recurring=db.prepare("SELECT * FROM recurring_blocks WHERE active=1 ORDER BY start_time").all();
-  const scheduleBlocks=activeScheduleBlocks().filter(x=>scheduleBlockAppliesOnDate(x,date)&&!x.silent_calendar);
+  const scheduleBlocks=activeScheduleBlocks().filter(x=>scheduleBlockAppliesOnDate(x,date));
   res.json({date,working:workingWindowForDate(date),restrictions,recurringBlocks:recurring,scheduleBlocks});
 });
 app.get("/api/trainer/location-plan",requireTrainer,(req,res)=>{
@@ -2193,7 +2226,7 @@ app.post("/api/my/bookings/:id/cancel-pending",requireAuth,(req,res)=>{const b=d
 app.post("/api/my/classes/:ref/manual-payment",requireAuth,(req,res)=>{
  const e=db.prepare(`SELECT e.*,c.price,c.title,p.name pet_name FROM class_enrolments e JOIN classes c ON c.id=e.class_id LEFT JOIN pets p ON p.id=e.pet_id WHERE e.booking_ref=? AND e.user_id=?`).get(req.params.ref,req.user.id);if(!e||e.enrolment_status!=="active"||e.payment_status!=="pending")return res.status(404).json({error:"Pending class payment not found."});if(expiryIsPast(e.hold_expires_at))return res.status(409).json({error:"The class hold has expired."});const code=normalizeMpesaReference(req.body.confirmationCode),amount=Number(req.body.amount),due=Math.max(0,Number(e.price||0)-Number(e.credit_applied||0));if(!/^[A-Z0-9]{10}$/.test(code))return res.status(400).json({error:"Enter the full 10-character M-Pesa confirmation reference."});if(!Number.isFinite(amount)||amount<=0||amount!==due)return res.status(400).json({error:`The manual payment should be KES ${due.toLocaleString()}.`});if(e.manual_payment_status==='submitted')return res.status(409).json({error:"This class payment confirmation has already been submitted to Amy."});db.prepare("UPDATE class_enrolments SET manual_payment_code=?,manual_payment_amount=?,manual_payment_status='submitted' WHERE id=?").run(code,amount,e.id);logClassEnrolmentEvent({...e,manual_payment_code:code},"manual_payment_submitted",{actorRole:"client",amount,reference:code,note:`Manual payment submitted for ${e.title}`});notifyTrainer({userId:req.user.id,petId:e.pet_id,classId:e.class_id,kind:'class_manual_payment',message:`Manual M-Pesa payment submitted for class ${e.title}: ${code}, KES ${amount}.`});res.json({ok:true,id:e.id,amount,mpesaRef:code})
 });
-app.post("/api/trainer/class-enrolments/:id/manual-payment",requireTrainer,(req,res)=>{const e=db.prepare(`SELECT e.*,c.title FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.id=?`).get(req.params.id);if(!e||e.manual_payment_status!=='submitted')return res.status(404).json({error:"Class manual payment submission not found."});const approve=!!req.body.approve;if(approve)db.prepare("UPDATE class_enrolments SET payment_status='paid',manual_payment_status='verified',hold_expires_at=NULL,payment_received_at=CURRENT_TIMESTAMP,mpesa_receipt_number=? WHERE id=?").run(e.manual_payment_code,e.id);else db.prepare("UPDATE class_enrolments SET manual_payment_status=NULL,manual_payment_code=NULL,manual_payment_amount=NULL WHERE id=?").run(e.id);db.prepare("UPDATE trainer_notifications SET resolved=1 WHERE class_id=? AND kind='class_manual_payment'").run(e.class_id);logClassEnrolmentEvent({...e,payment_status:approve?'paid':e.payment_status},approve?'manual_payment_verified':'manual_payment_rejected',{actorRole:'trainer',amount:e.manual_payment_amount,reference:e.manual_payment_code,note:e.title});res.json({ok:true})});
+app.post("/api/trainer/class-enrolments/:id/manual-payment",requireTrainer,(req,res)=>{const e=db.prepare(`SELECT e.*,c.title FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.id=?`).get(req.params.id);if(!e||e.manual_payment_status!=='submitted')return res.status(404).json({error:"Class manual payment submission not found."});const approve=!!req.body.approve;if(approve)db.prepare("UPDATE class_enrolments SET payment_status='paid',manual_payment_status='verified',hold_expires_at=NULL,payment_received_at=CURRENT_TIMESTAMP,mpesa_receipt_number=? WHERE id=?").run(e.manual_payment_code,e.id);else db.prepare("UPDATE class_enrolments SET manual_payment_status=NULL,manual_payment_code=NULL,manual_payment_amount=NULL WHERE id=?").run(e.id);db.prepare("UPDATE trainer_notifications SET resolved=1 WHERE kind='class_manual_payment' AND (class_id=? OR (class_id IS NULL AND user_id=?))").run(e.class_id,e.user_id);logClassEnrolmentEvent({...e,payment_status:approve?'paid':e.payment_status},approve?'manual_payment_verified':'manual_payment_rejected',{actorRole:'trainer',amount:e.manual_payment_amount,reference:e.manual_payment_code,note:e.title});res.json({ok:true})});
 
 app.post("/api/my/bookings/:id/manual-payment",requireAuth,(req,res)=>{
  const b=db.prepare("SELECT * FROM bookings WHERE id=? AND user_id=?").get(req.params.id,req.user.id);

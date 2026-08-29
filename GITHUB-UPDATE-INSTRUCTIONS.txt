@@ -1,4 +1,4 @@
-v21.9.16e CALENDAR CLARITY HOTFIX
+v21.9.16f CONSOLIDATED TEST UPDATE
 
 Replace:
 - server.js
@@ -11,17 +11,14 @@ Replace:
 
 Do NOT reset the database.
 
-Immediate tests:
-1. October month view: morning Home visits unavailable should be green; afternoon Arena unavailable should be orange.
-2. Lunch should not create a third month colour.
-3. Genuine Amy unavailable should still be grey.
-4. Booking circles remain solid blue/green/purple.
-5. Open a day schedule:
-   - available rows plain
-   - no paired colour bands
-   - arena booking one blue accent
-   - home booking one green accent
-   - class one purple accent
-   - lunch neutral cream
-   - unavailable location shown as text only
-6. Confirm no overlapsClient warning returns.
+Test:
+1. New client: invalid email such as a&b.com must fail immediately.
+2. New/reset password: fewer than 8, no letter, or no number must fail; spaces and symbols must be accepted.
+3. Existing client passwords must still log in.
+4. Course disappears 24 hours before first session; stale page enrol attempt must also fail.
+5. Month calendar: grey only for Amy unavailable; no arena/home restriction backgrounds; booking circles unchanged.
+6. Day agenda: no availability colour bands; lunch shows LUNCH.
+7. Book for client override says "Override arena or home visit unavailability"; success message does not mention override.
+8. Scheduling: active block button says Change; edit/save and Cancel block both work.
+9. Needs attention: Verify payment works for class manual M-Pesa.
+10. Home heading and Client Portal login wording match the new copy.

@@ -1,16 +1,20 @@
-The Custom Made Canine v21.9.16e ONLINE TEST
+The Custom Made Canine v21.9.16f ONLINE TEST
 
-Calendar clarity hotfix:
-- Month view shows broad AM/PM location planning only.
-- Detailed date blocks such as lunch no longer colour the month.
-- Home visits unavailable = green; arena unavailable = orange; Amy unavailable = grey.
-- Location-specific states take precedence over generic Amy-unavailable colouring.
-- Day schedule no longer shows paired arena/home colour bands on every row.
-- Available time is plain/default.
-- Unavailable location is shown as small text only.
-- Arena booking = blue accent; home booking = green accent; class = purple accent.
-- Lunch is a neutral cream diary item.
-- Genuine blocked/Amy-unavailable time remains muted grey.
+Changes in this batch:
+- New-client email validation in browser and server.
+- New/reset passwords require 8+ characters with at least one letter and one number; symbols and spaces are permitted.
+- Existing passwords remain valid at login.
+- Public classes disappear 24 hours before the first session and server enrolment enforces the same Nairobi-time cutoff.
+- Trainer month calendar now uses grey only for Amy-unavailable full/half-day periods.
+- Arena/home restriction colouring removed from Amy's month calendar.
+- Arena booking, home visit and class booking circles remain.
+- Daily agenda availability colour bands/status colouring removed.
+- Silent lunch now appears in the daily agenda as LUNCH.
+- Trainer one-booking override wording simplified to "Override arena or home visit unavailability".
+- Provisional booking confirmation no longer mentions the schedule override.
+- Scheduling blocks now use Change; Amy can edit and save or Cancel block.
+- Home heading centred and split: Set your dog up / for life!
+- Client Portal entry copy simplified to PLEASE LOG IN, Log in / Sign up.
+- Class manual payment verification fixed by adding class-aware trainer notifications, including legacy notification resolution.
 
-v21.9.16d overlap fix, trainer-login fix, solid booking circles, re-enrolment and payment recovery are preserved.
 No database reset is required.
