@@ -1,4 +1,4 @@
-v21.9.16j BATCH 1 CORRECTIONS
+v21.9.16k RESOURCE LIBRARY POLISH
 
 Replace:
 - server.js
@@ -11,13 +11,9 @@ Replace:
 
 Do NOT reset the database.
 
-Focused retest:
-1. Resource picker search.
-2. Whole-course cancellation wording/flow.
-3. Individual session Reschedule / Cancel session inside a paid trainer-created package.
-4. Refund → credit → refund: Latest 3 account updates remain visible.
-5. No-refund class note appears in Recent Account Updates.
-6. Private partial M-Pesa refund live input filtering/capitalisation.
-7. Inactive cards have no calendar button.
-8. “Add all classes to calendar” wording.
-9. iPhone Add to calendar; desktop/Android should remain working.
+Focused test:
+1. Training Resources > search by title, file type, and category.
+2. Confirm resources are sorted by type, then alphabetically by title.
+3. Check titles are easy to scan.
+4. Manage a resource assigned to several clients: use individual Remove access buttons.
+5. Remove a resource: warning should name/count affected clients before confirmation.

@@ -1,14 +1,10 @@
-The Custom Made Canine v21.9.16j ONLINE TEST — Batch 1 corrections
+The Custom Made Canine v21.9.16k ONLINE TEST — Training Resource Library polish
 
-Corrections from the completed v21.9.16i test:
-- Class cancellation clearly cancels the client's entire course enrolment / remaining sessions, not one class session.
-- Trainer-created multi-session private packages allow individual paid sessions to be rescheduled or cancelled.
-- Resource picker search/filter fixed.
-- Recent Account Updates now come from preserved booking/class history, so later refunds/credits do not overwrite earlier entries. Latest 3 within 30 days are shown.
-- Class No Refund notes appear in Recent Account Updates.
-- Private M-Pesa refund entry uses a live uppercase 10-character alphanumeric field.
-- Calendar actions are suppressed for inactive/cancelled/refunded bookings.
-- Class button reads “Add all classes to calendar”.
-- iPhone calendar action now opens an inline authenticated text/calendar response; desktop/Android keep the working file flow.
+- Added Search Resources to the Training Resources library.
+- Resource list sorts by file type, then title.
+- Resource titles are visually more prominent.
+- Manage opens a proper access panel showing every assigned client with an individual Remove access button.
+- Removing a resource now warns how many clients are affected and names them before removal.
+- Appointment-side searchable resource picker is unchanged.
 
 No database reset required.
