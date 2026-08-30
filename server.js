@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.16m-online-test";
+const APP_VERSION = "21.9.16o-online-test";
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -1513,7 +1513,7 @@ app.get("/api/my/resources",requireAuth,(req,res)=>{
       SELECT 1 FROM resource_access a
       LEFT JOIN pets p ON p.id=a.pet_id
       WHERE a.resource_id=r.id AND (a.user_id=? OR p.user_id=?
-        OR a.class_id IN (SELECT class_id FROM class_enrolments WHERE user_id=? AND enrolment_status='active' AND payment_status IN ('paid','demo_paid')))
+        OR a.class_id IN (SELECT class_id FROM class_enrolments WHERE user_id=? AND enrolment_status='active' AND payment_status IN ('paid','demo_paid','credit_paid')))
     )
     ORDER BY r.created_at DESC
   `).all(req.user.id,req.user.id,req.user.id,req.user.id);
@@ -2036,7 +2036,7 @@ function weekdayName(date){return new Date(date+'T12:00:00').toLocaleDateString(
 function resourceType(file){const m=file?.mimetype||"";if(m.includes("pdf"))return"pdf";if(m.startsWith("image/"))return"image";if(m.startsWith("video/"))return"video";if(m.startsWith("audio/"))return"audio";return"link"}
 app.get("/api/trainer/resources",requireTrainer,(req,res)=>res.json(db.prepare("SELECT * FROM resources WHERE archived=0 ORDER BY created_at DESC").all()));
 app.post("/api/trainer/resources",requireTrainer,upload.single("file"),(req,res)=>{let url=req.body.url||"",type=req.body.type||"";if(req.file)type=resourceType(req.file);if(!req.body.title||(!url&&!req.file))return res.status(400).json({error:"Please provide a title and a file or link."});if(!["video","image","pdf","link","audio"].includes(type))type="link";const id=db.prepare("INSERT INTO resources(title,description,type,url,category) VALUES(?,?,?,?,?)").run(req.body.title,req.body.description||"",type,url,req.body.category||"General").lastInsertRowid;if(req.file){url=`/api/trainer/resources/${id}/file`;db.prepare("UPDATE resources SET url=?,description=? WHERE id=?").run(url,`__FILE__${req.file.filename} ${req.body.description||""}`.trim(),id)}res.json(db.prepare("SELECT * FROM resources WHERE id=?").get(id))});
-app.get("/api/trainer/resources/:id/file",requireAuth,(req,res)=>{const r=db.prepare("SELECT * FROM resources WHERE id=?").get(req.params.id);if(!r)return res.status(404).end();if(req.user.role!=="trainer"){const ok=db.prepare(`SELECT 1 FROM resource_access a LEFT JOIN pets p ON p.id=a.pet_id WHERE a.resource_id=? AND (a.user_id=? OR p.user_id=? OR a.class_id IN (SELECT class_id FROM class_enrolments WHERE user_id=? AND enrolment_status='active' AND payment_status IN ('paid','demo_paid'))) LIMIT 1`).get(r.id,req.user.id,req.user.id,req.user.id);if(!ok)return res.status(403).end()}const m=(r.description||"").match(/^__FILE__([^ ]+)/);if(!m)return res.status(404).end();const full=path.join(UPLOAD_DIR,m[1]);if(!fs.existsSync(full))return res.status(404).end();res.sendFile(full)});
+app.get("/api/trainer/resources/:id/file",requireAuth,(req,res)=>{const r=db.prepare("SELECT * FROM resources WHERE id=?").get(req.params.id);if(!r)return res.status(404).end();if(req.user.role!=="trainer"){const ok=db.prepare(`SELECT 1 FROM resource_access a LEFT JOIN pets p ON p.id=a.pet_id WHERE a.resource_id=? AND (a.user_id=? OR p.user_id=? OR a.class_id IN (SELECT class_id FROM class_enrolments WHERE user_id=? AND enrolment_status='active' AND payment_status IN ('paid','demo_paid','credit_paid'))) LIMIT 1`).get(r.id,req.user.id,req.user.id,req.user.id);if(!ok)return res.status(403).end()}const m=(r.description||"").match(/^__FILE__([^ ]+)/);if(!m)return res.status(404).end();const full=path.join(UPLOAD_DIR,m[1]);if(!fs.existsSync(full))return res.status(404).end();res.sendFile(full)});
 app.put("/api/trainer/resources/:id",requireTrainer,(req,res)=>{
  const r=db.prepare("SELECT * FROM resources WHERE id=? AND archived=0").get(req.params.id);
  if(!r)return res.status(404).json({error:"Resource not found."});
@@ -2049,6 +2049,19 @@ app.put("/api/trainer/resources/:id",requireTrainer,(req,res)=>{
 });
 app.delete("/api/trainer/resources/:id",requireTrainer,(req,res)=>{db.prepare("UPDATE resources SET archived=1 WHERE id=?").run(req.params.id);res.json({ok:true})});
 app.post("/api/trainer/resources/:id/access",requireTrainer,(req,res)=>{const {userId,note}=req.body;if(!userId)return res.status(400).json({error:"Choose a client."});db.prepare("INSERT INTO resource_access(resource_id,user_id,pet_id,class_id,note) VALUES(?,?,NULL,NULL,?)").run(req.params.id,userId,note||null);const r=db.prepare("SELECT title FROM resources WHERE id=?").get(req.params.id);logActivity({userId:Number(userId),actorUserId:req.user.id,actorRole:'trainer',action:'resource_assigned',details:`Amy shared resource: ${r?.title||'Training resource'}.`});res.json({ok:true})});
+app.post("/api/trainer/resources/:id/class-access",requireTrainer,(req,res)=>{
+ const classId=Number(req.body.classId),note=String(req.body.note||"").trim();
+ const r=db.prepare("SELECT id,title FROM resources WHERE id=? AND archived=0").get(req.params.id);
+ const course=db.prepare("SELECT id,title FROM classes WHERE id=?").get(classId);
+ if(!r)return res.status(404).json({error:"Resource not found."});
+ if(!course)return res.status(404).json({error:"Class not found."});
+ const existing=db.prepare("SELECT id FROM resource_access WHERE resource_id=? AND class_id=? LIMIT 1").get(r.id,course.id);
+ if(existing)db.prepare("UPDATE resource_access SET note=? WHERE id=?").run(note||null,existing.id);
+ else db.prepare("INSERT INTO resource_access(resource_id,user_id,pet_id,class_id,note) VALUES(?,NULL,NULL,?,?)").run(r.id,course.id,note||null);
+ const participants=db.prepare("SELECT COUNT(DISTINCT user_id) n FROM class_enrolments WHERE class_id=? AND enrolment_status='active' AND payment_status IN ('paid','demo_paid','credit_paid')").get(course.id)?.n||0;
+ logActivity({classId:course.id,actorUserId:req.user.id,actorRole:"trainer",action:"resource_shared_with_class",details:`Resource shared with class ${course.title}: ${r.title}.`});
+ res.json({ok:true,participants:Number(participants)});
+});
 app.get("/api/trainer/resources/:id/access",requireTrainer,(req,res)=>res.json(db.prepare(`SELECT a.*,u.name user_name,p.name pet_name,c.title class_title FROM resource_access a LEFT JOIN users u ON u.id=a.user_id LEFT JOIN pets p ON p.id=a.pet_id LEFT JOIN classes c ON c.id=a.class_id WHERE a.resource_id=?`).all(req.params.id)));
 app.delete("/api/trainer/resources/access/:id",requireTrainer,(req,res)=>{db.prepare("DELETE FROM resource_access WHERE id=?").run(req.params.id);res.json({ok:true})});
 
@@ -2227,7 +2240,15 @@ app.get("/api/trainer/clients",requireTrainer,(req,res)=>{
 app.get("/api/trainer/client/:id",requireTrainer,(req,res)=>{
   const user=db.prepare("SELECT id,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,created_at,last_login_at,status_override,COALESCE(client_status,'current') client_status FROM users WHERE id=? AND role='client'").get(req.params.id);
   if(!user)return res.status(404).json({error:"Client not found."}); user.client_status=calculatedClientStatus(user);
-  res.json({user,pets:petDetailsForUser(user.id,true),bookings:db.prepare("SELECT * FROM bookings WHERE user_id=? ORDER BY start_at DESC").all(user.id),packages:db.prepare("SELECT * FROM booking_packages WHERE user_id=? ORDER BY created_at DESC").all(user.id),classes:db.prepare("SELECT e.*,c.title,c.start_date,c.end_date FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.user_id=?").all(user.id),creditBalance:clientCreditBalance(user.id),creditHistory:db.prepare("SELECT * FROM client_credit_ledger WHERE user_id=? ORDER BY created_at DESC LIMIT 30").all(user.id),activity:db.prepare(`SELECT a.created_at,a.action,a.details,p.name pet_name,c.title class_title FROM activity_history a LEFT JOIN pets p ON p.id=a.pet_id LEFT JOIN classes c ON c.id=a.class_id WHERE a.user_id=? ORDER BY a.created_at DESC LIMIT 50`).all(user.id)});
+  const resources=db.prepare(`
+    SELECT DISTINCT r.id,r.title,r.type,r.category,
+      COALESCE((SELECT a2.note FROM resource_access a2 WHERE a2.resource_id=r.id AND a2.user_id=? ORDER BY a2.id DESC LIMIT 1),
+               (SELECT a3.note FROM resource_access a3 WHERE a3.resource_id=r.id AND a3.class_id IN (SELECT class_id FROM class_enrolments WHERE user_id=? AND enrolment_status='active' AND payment_status IN ('paid','demo_paid','credit_paid')) ORDER BY a3.id DESC LIMIT 1)) note
+    FROM resources r JOIN resource_access a ON a.resource_id=r.id
+    WHERE r.archived=0 AND (a.user_id=? OR a.class_id IN (SELECT class_id FROM class_enrolments WHERE user_id=? AND enrolment_status='active' AND payment_status IN ('paid','demo_paid','credit_paid')))
+    ORDER BY COALESCE(r.category,'General'),r.type,r.title
+  `).all(user.id,user.id,user.id,user.id);
+  res.json({user,pets:petDetailsForUser(user.id,true),bookings:db.prepare("SELECT * FROM bookings WHERE user_id=? ORDER BY start_at DESC").all(user.id),packages:db.prepare("SELECT * FROM booking_packages WHERE user_id=? ORDER BY created_at DESC").all(user.id),classes:db.prepare("SELECT e.*,c.title,c.start_date,c.end_date FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.user_id=?").all(user.id),resources,creditBalance:clientCreditBalance(user.id),creditHistory:db.prepare("SELECT * FROM client_credit_ledger WHERE user_id=? ORDER BY created_at DESC LIMIT 30").all(user.id),activity:db.prepare(`SELECT a.created_at,a.action,a.details,p.name pet_name,c.title class_title FROM activity_history a LEFT JOIN pets p ON p.id=a.pet_id LEFT JOIN classes c ON c.id=a.class_id WHERE a.user_id=? ORDER BY a.created_at DESC LIMIT 50`).all(user.id)});
 });
 app.put("/api/trainer/pets/:id/private-notes",requireTrainer,(req,res)=>{
   const pet=db.prepare("SELECT id,user_id,name FROM pets WHERE id=?").get(req.params.id);

@@ -1,8 +1,8 @@
-The Custom Made Canine v21.9.16m ONLINE TEST
+The Custom Made Canine v21.9.16o ONLINE TEST
 
-Small patch on top of v21.9.16l:
-- Keeps the complete Training Resource Library patch from v21.9.16l.
-- Fixes the client “Cancel course enrolment” button. The course title is now looked up safely in app state instead of being injected into the inline button handler, which could break the click action when course names contained normal text/quotes.
-- Cancellation still applies to the client's whole course enrolment / remaining sessions; the course itself continues for other clients and Amy then gets the refund decision.
+Targeted correction:
+- Scheduled Classes now shows a prominent standalone “Share training resource with this class” action directly under the selected course heading, rather than squeezing it into the Edit/Delete button row.
+- Daily agenda now always displays real class sessions and bookings even when that date is marked as a non-working day or the event falls outside the currently configured working-hours window. This resolves cases where a purple class dot appeared in the month view but the class vanished in Daily View.
+- Existing v21.9.16n resource sharing backend/client-profile support is preserved.
 
 No database reset required.
