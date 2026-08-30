@@ -1,8 +1,12 @@
-The Custom Made Canine v21.9.16o ONLINE TEST
+The Custom Made Canine v21.9.16p ONLINE TEST
 
-Targeted correction:
-- Scheduled Classes now shows a prominent standalone “Share training resource with this class” action directly under the selected course heading, rather than squeezing it into the Edit/Delete button row.
-- Daily agenda now always displays real class sessions and bookings even when that date is marked as a non-working day or the event falls outside the currently configured working-hours window. This resolves cases where a purple class dot appeared in the month view but the class vanished in Daily View.
-- Existing v21.9.16n resource sharing backend/client-profile support is preserved.
+Course creation time-picker correction:
+- Removed the custom/native clock popup from class start/end times.
+- After Amy chooses the first course date, the app loads real availability in half-hour blocks.
+- Existing private bookings, classes, unavailable time, recurring blocks, arena restrictions and working hours are excluded.
+- Amy chooses Start first, then End from the remaining contiguous available block.
+- Works with touch buttons on Android/iPhone and normal buttons on desktop.
+- All future recurrence dates are still validated on save, so a later conflicting session cannot be created accidentally.
+- Existing course editing remains locked once past sessions exist.
 
 No database reset required.

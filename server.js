@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.16o-online-test";
+const APP_VERSION = "21.9.16p-online-test";
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -1981,6 +1981,40 @@ app.delete("/api/trainer/classes/:id",requireTrainer,(req,res)=>{
   db.prepare("DELETE FROM classes WHERE id=?").run(course.id);
   logActivity({classId:Number(course.id),actorUserId:req.user.id,actorRole:"trainer",action:"class_deleted",details:`Course deleted: ${course.title}.`});
   res.json({ok:true});
+});
+
+app.get("/api/trainer/class-availability",requireTrainer,(req,res)=>{
+ const date=String(req.query.date||""),locationType=String(req.query.locationType||"arena"),excludeClassId=Number(req.query.excludeClassId||0);
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return res.status(400).json({error:"Choose a valid class date."});
+ if(!["arena","alternate"].includes(locationType))return res.status(400).json({error:"Choose a valid class location."});
+ const working=workingWindowForDate(date);
+ if(!working.enabled||!working.start_time||!working.end_time)return res.json({blocks:[],message:"Unavailable on this date."});
+ const startMs=wallClockMs(isoDateTime(date,working.start_time)),endMs=wallClockMs(isoDateTime(date,working.end_time));
+ const bookings=db.prepare("SELECT * FROM bookings WHERE status NOT IN ('cancelled','expired') AND payment_status IN ('pending','paid','demo_paid','credit_paid')").all();
+ const classes=db.prepare("SELECT s.*,c.id class_id,c.title,c.status FROM class_sessions s JOIN classes c ON c.id=s.class_id WHERE c.status='open' AND c.id!=?").all(excludeClassId||-1);
+ const blocks=db.prepare("SELECT * FROM availability_blocks").all();
+ const segments=[];
+ for(let ms=startMs;ms+30*60000<=endMs;ms+=30*60000){
+   const start=wallClockIso(ms),end=wallClockIso(ms+30*60000);
+   let available=true,reason="";
+   if(recurringBlockConflict(start,end)){available=false;reason="Blocked";}
+   if(available&&scheduleAmyConflict(start,end)){available=false;reason="Unavailable";}
+   if(available&&blocks.some(x=>overlaps(start,end,x.start_at,x.end_at))){available=false;reason="Blocked";}
+   if(available&&bookings.some(x=>overlaps(start,end,bookingOccupiedStart(x),x.buffer_end_at||x.end_at))){available=false;reason="Booking";}
+   if(available&&classes.some(x=>overlaps(start,end,isoDateTime(x.session_date,x.start_time),isoDateTime(x.session_date,x.end_time)))){available=false;reason="Class";}
+   if(available&&locationType==="arena"&&(serviceUnavailable("arena",start,end)||scheduleBlockConflict("arena",start,end))){available=false;reason="Arena unavailable";}
+   segments.push({start:start.slice(11,16),end:end.slice(11,16),available,reason});
+ }
+ const blocksOut=[];let current=null;
+ for(const seg of segments){
+   if(seg.available){
+     if(!current)current={start:seg.start,end:seg.end};
+     else if(current.end===seg.start)current.end=seg.end;
+     else {blocksOut.push(current);current={start:seg.start,end:seg.end}}
+   }else if(current){blocksOut.push(current);current=null}
+ }
+ if(current)blocksOut.push(current);
+ res.json({blocks:blocksOut,segments,working,message:blocksOut.length?"":"No available class time on this date."});
 });
 
 app.post("/api/trainer/classes",requireTrainer,(req,res)=>{

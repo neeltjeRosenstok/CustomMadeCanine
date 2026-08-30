@@ -1302,3 +1302,17 @@ input[type="password"]{text-transform:none!important}
 /* v21.9.16o class visibility */
 .class-resource-action{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0 16px;padding:12px 14px;border:1px solid rgba(37,33,94,.14);border-radius:12px;background:rgba(255,255,255,.72)}
 .class-resource-action .primary{margin:0}
+
+
+/* v21.9.16p course availability picker */
+.class-availability-picker{margin:12px 0 16px;padding:13px 14px;border:1px solid rgba(37,33,94,.15);border-radius:12px;background:rgba(255,255,255,.72)}
+.class-availability-picker h3{margin:0 0 8px}
+.availability-window-list{display:flex;gap:7px;flex-wrap:wrap;margin:6px 0 12px}
+.availability-window-list span{padding:5px 9px;border-radius:999px;border:1px solid rgba(37,33,94,.16);font-size:.88rem}
+.class-time-choice{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.choice-label{display:block;font-weight:600;margin-bottom:6px}
+.time-blocks{display:flex;gap:6px;flex-wrap:wrap}
+.time-choice{min-width:64px;padding:8px 10px;border-radius:9px;border:1px solid rgba(37,33,94,.25);background:#fff;color:var(--navy);font:inherit;cursor:pointer}
+.time-choice.selected{box-shadow:inset 0 0 0 2px var(--navy);font-weight:650}
+.class-time-summary{padding:10px 12px;border-radius:10px;background:#fff;margin:8px 0 14px}
+@media(max-width:640px){.class-time-choice{grid-template-columns:1fr}.time-choice{min-height:42px;flex:1 0 64px}}
