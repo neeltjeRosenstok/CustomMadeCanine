@@ -1,4 +1,4 @@
-v21.9.16q COURSE START + DURATION
+v21.9.16r PRE-CLEANUP STABILITY FIX
 
 Replace:
 - server.js
@@ -6,15 +6,11 @@ Replace:
 - VERSION.txt
 - GITHUB-UPDATE-INSTRUCTIONS.txt
 - public/app.js
-- public/styles.css
 - public/index.html
 
 Do NOT reset the database.
 
 Focused test:
-1. New Course on iPhone: choose date and confirm picker behaves more steadily.
-2. Choose 60 or 90 min.
-3. Choose a start time; page should stay where it is.
-4. Confirm end time is calculated automatically.
-5. Start options must disappear when the chosen duration no longer fits.
-6. Repeat on Android and desktop.
+1. Client submits manual M-Pesa reference for private booking. Confirm status says Awaiting confirmation and only one message appears: "Awaiting confirmation by Amy. Your booking has been recorded."
+2. Cancel a paid class enrolment from Client Portal. Confirm the whole course enrolment cancels and Amy receives the refund/credit decision requirement.
+3. Open Amy > Clients. Dog names should appear without unexplained numeric counters.
