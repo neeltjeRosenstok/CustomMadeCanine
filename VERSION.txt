@@ -1,12 +1,12 @@
-The Custom Made Canine v21.9.16p ONLINE TEST
+The Custom Made Canine v21.9.16q ONLINE TEST
 
-Course creation time-picker correction:
-- Removed the custom/native clock popup from class start/end times.
-- After Amy chooses the first course date, the app loads real availability in half-hour blocks.
-- Existing private bookings, classes, unavailable time, recurring blocks, arena restrictions and working hours are excluded.
-- Amy chooses Start first, then End from the remaining contiguous available block.
-- Works with touch buttons on Android/iPhone and normal buttons on desktop.
-- All future recurrence dates are still validated on save, so a later conflicting session cannot be created accidentally.
-- Existing course editing remains locked once past sessions exist.
+Targeted course-creation UX correction:
+- Keeps the real availability-based class time picker from v21.9.16p.
+- Replaces separate Start/End selection with Duration (60 or 90 minutes) + Start time only.
+- Start options are filtered so the full selected duration fits in a genuinely free block.
+- Choosing a start time no longer re-renders the entire modal, so the screen does not jump back to the top.
+- Apple date selection no longer triggers an immediate preliminary re-render while availability is being fetched, reducing the repeated date-picker close/reopen instability.
+- Existing course time is inferred as 60/90 minutes when editing future-only courses.
+- The 09:00/10:00 availability logic itself is unchanged because the reported 10:00 issue was confirmed to be test setup rather than code.
 
 No database reset required.

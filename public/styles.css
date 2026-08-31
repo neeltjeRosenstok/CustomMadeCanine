@@ -1316,3 +1316,7 @@ input[type="password"]{text-transform:none!important}
 .time-choice.selected{box-shadow:inset 0 0 0 2px var(--navy);font-weight:650}
 .class-time-summary{padding:10px 12px;border-radius:10px;background:#fff;margin:8px 0 14px}
 @media(max-width:640px){.class-time-choice{grid-template-columns:1fr}.time-choice{min-height:42px;flex:1 0 64px}}
+
+/* v21.9.16q course start + duration */
+.class-duration-choice{margin-bottom:12px}
+.class-selected-time{margin:10px 0 0}

@@ -1,4 +1,4 @@
-v21.9.16p COURSE AVAILABILITY PICKER
+v21.9.16q COURSE START + DURATION
 
 Replace:
 - server.js
@@ -12,9 +12,9 @@ Replace:
 Do NOT reset the database.
 
 Focused test:
-1. Scheduling > New Course.
-2. Choose a date with known bookings/classes.
-3. Confirm only free half-hour windows appear.
-4. Choose Start, then End. No native clock popup should appear.
-5. Repeat on desktop and Android.
-6. Try creating a recurring course where a later date conflicts: save must still reject the course with the conflict warning.
+1. New Course on iPhone: choose date and confirm picker behaves more steadily.
+2. Choose 60 or 90 min.
+3. Choose a start time; page should stay where it is.
+4. Confirm end time is calculated automatically.
+5. Start options must disappear when the chosen duration no longer fits.
+6. Repeat on Android and desktop.
