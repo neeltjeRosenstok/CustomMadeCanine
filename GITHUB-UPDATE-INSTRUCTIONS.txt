@@ -1,16 +1,7 @@
-v21.9.16r PRE-CLEANUP STABILITY FIX
+v21.9.16r1 MANUAL M-PESA LIMIT HOTFIX
 
-Replace:
-- server.js
-- package.json
-- VERSION.txt
-- GITHUB-UPDATE-INSTRUCTIONS.txt
-- public/app.js
-- public/index.html
+Replace server.js, package.json, VERSION.txt, GITHUB-UPDATE-INSTRUCTIONS.txt, public/app.js and public/index.html.
 
 Do NOT reset the database.
 
-Focused test:
-1. Client submits manual M-Pesa reference for private booking. Confirm status says Awaiting confirmation and only one message appears: "Awaiting confirmation by Amy. Your booking has been recorded."
-2. Cancel a paid class enrolment from Client Portal. Confirm the whole course enrolment cancels and Amy receives the refund/credit decision requirement.
-3. Open Amy > Clients. Dog names should appear without unexplained numeric counters.
+Focused test: manual M-Pesa field must keep only uppercase letters/numbers, stop at 10 characters, and reject fewer than 10 on submit. Confirm course cancellation still works.

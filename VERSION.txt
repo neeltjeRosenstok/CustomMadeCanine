@@ -1,10 +1,8 @@
-The Custom Made Canine v21.9.16r ONLINE TEST
+The Custom Made Canine v21.9.16r1 ONLINE TEST
 
-Pre-cleanup stability corrections:
-- Manual M-Pesa submitted booking status now reads "Awaiting confirmation".
-- Client notice now reads exactly: "Awaiting confirmation by Amy. Your booking has been recorded."
-- Removed the redundant second manual-payment verification notice from private booking cards.
-- Fixed the client Cancel course enrolment button so it safely passes only the enrolment ID; the course title is looked up inside the existing handler.
-- Removed unexplained class/private count numbers beside dog names in Amy's client list.
+Tiny pre-cleanup hotfix:
+- Restores strict live manual M-Pesa reference entry: uppercase alphanumeric only, maximum 10 characters.
+- Server-side exact 10-character validation remains in place.
+- Whole-course cancellation fix from v21.9.16r is unchanged.
 
 No database reset required.
