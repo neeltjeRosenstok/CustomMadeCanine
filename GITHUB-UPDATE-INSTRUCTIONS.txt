@@ -1,23 +1,11 @@
-v21.9.16z1 CUMULATIVE UPDATE
+v21.9.16z4 QR OPTIONAL STEPS
 
-This patch is cumulative. You do NOT need to install v/w/x/y/z sequentially.
-
-Replace ALL of these files in GitHub:
+Replace:
 - server.js
 - package.json
 - VERSION.txt
 - GITHUB-UPDATE-INSTRUCTIONS.txt
 - public/app.js
-- public/styles.css
 - public/index.html
-- public/mpesa-paybill-qr.jpg
-- public/brand-logo.png
-
-DELETE public/mpesa-paybill-qr.png if it still exists.
 
 Do NOT reset the database.
-
-After Render deploys, its log should say:
-The Custom Made Canine v21.9.16z1-online-test listening on port ...
-
-Then hard refresh the browser (Ctrl+F5 on desktop).
