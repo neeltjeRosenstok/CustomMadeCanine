@@ -1,16 +1,23 @@
-v21.9.16z LOGO REPLACEMENT
+v21.9.16z1 CUMULATIVE UPDATE
 
-Replace:
+This patch is cumulative. You do NOT need to install v/w/x/y/z sequentially.
+
+Replace ALL of these files in GitHub:
 - server.js
 - package.json
 - VERSION.txt
 - GITHUB-UPDATE-INSTRUCTIONS.txt
+- public/app.js
+- public/styles.css
 - public/index.html
+- public/mpesa-paybill-qr.jpg
 - public/brand-logo.png
+
+DELETE public/mpesa-paybill-qr.png if it still exists.
 
 Do NOT reset the database.
 
-Focused test:
-1. Hard refresh the home page.
-2. Confirm the new circular paw logo appears anywhere the brand logo is used.
-3. Confirm the logo has not been altered.
+After Render deploys, its log should say:
+The Custom Made Canine v21.9.16z1-online-test listening on port ...
+
+Then hard refresh the browser (Ctrl+F5 on desktop).

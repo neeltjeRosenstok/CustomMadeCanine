@@ -1,8 +1,19 @@
-The Custom Made Canine v21.9.16z ONLINE TEST
+The Custom Made Canine v21.9.16z1 ONLINE TEST
 
-Focused logo replacement:
-- Replaced public/brand-logo.png with the exact logo file supplied by the user.
-- The supplied logo was copied byte-for-byte and not altered, redrawn, resized or regenerated.
-- No functional app changes.
+CUMULATIVE correction package.
+
+This build includes ALL recent PayBill presentation changes plus the supplied QR and logo:
+- Manual PayBill only; no Safaricom One App button.
+- Left-aligned step-by-step PayBill instructions.
+- Amy L Rapp aligned under The Custom Made Canine.
+- PayBill 542542, Account 727777 and amount due bold.
+- Italic warning: Never share your M-Pesa PIN details with anyone.
+- No redundant technical text below the confirmation-code field.
+- No redundant Awaiting confirmation message on the payment-entry screen.
+- Exact requested QR caption using the wording M-Pesa App.
+- Exact user-supplied blue QR image, unaltered.
+- Exact user-supplied logo, unaltered.
+- Exact 10-character M-Pesa confirmation-code input behaviour remains.
+- Server-visible version marker corrected to match this build.
 
 No database reset required.

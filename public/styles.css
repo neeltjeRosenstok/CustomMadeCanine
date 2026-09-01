@@ -1332,8 +1332,17 @@ input[type="password"]{text-transform:none!important}
 .paybill-details>div{display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:baseline;padding-bottom:7px;border-bottom:1px solid rgba(37,33,94,.12)}
 .paybill-details span{font-size:.88rem}
 .paybill-details strong{font-size:1.08rem}
-.paybill-app-link{display:inline-flex;justify-content:center;text-decoration:none;margin-top:3px}
 .paybill-instructions{margin:14px 0;padding:10px 12px;border:1px solid rgba(37,33,94,.15);border-radius:10px}
 .paybill-instructions summary{cursor:pointer;font-weight:650}
 .paybill-instructions ol{margin-bottom:0}
 @media(max-width:620px){.paybill-quick-grid{grid-template-columns:1fr}.paybill-qr img{width:min(72vw,220px)}.paybill-details>div{grid-template-columns:90px 1fr}}
+
+
+/* v21.9.16v paybill layout polish */
+.paybill-details .business-stack{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px}
+.paybill-details .business-stack small{margin:0;text-align:left}
+.paybill-details .paybill-value{font-weight:800}
+.paybill-step-list{padding-left:1.4rem;margin-left:0;text-align:left}
+.paybill-step-list li{text-align:left;padding-left:.15rem;margin:.38rem 0}
+.paybill-instructions,.paybill-instructions summary{text-align:left}
+.mpesa-pin-warning{text-align:left;margin:.45rem 0 1rem}
