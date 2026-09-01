@@ -1,12 +1,8 @@
-The Custom Made Canine v21.9.16u ONLINE TEST
+The Custom Made Canine v21.9.16z ONLINE TEST
 
-Manual M-Pesa PayBill phase:
-- Automatic STK Push is hidden and disabled by default, but its integration code is retained behind STK_PUSH_ENABLED=true for future use.
-- Live client payment flow is manual PayBill.
-- PayBill 542542; Account 727777; The Custom Made Canine (Amy L Rapp).
-- Added the supplied QR code to the payment screen.
-- Added a Safaricom One App launch link and complete PayBill instructions.
-- Client still submits the exact 10-character M-Pesa confirmation code; Amy still verifies it.
-- Credit handling remains available.
+Focused logo replacement:
+- Replaced public/brand-logo.png with the exact logo file supplied by the user.
+- The supplied logo was copied byte-for-byte and not altered, redrawn, resized or regenerated.
+- No functional app changes.
 
 No database reset required.
