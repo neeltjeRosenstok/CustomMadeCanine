@@ -11,7 +11,8 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.16s-cleanup1-online-test";
+const APP_VERSION = "21.9.16u-manual-paybill-online-test";
+const STK_PUSH_ENABLED = process.env.STK_PUSH_ENABLED === "true"; // dormant future option; manual PayBill is the live payment flow
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -750,6 +751,10 @@ async function routeTravelMinutes(origin,destination) {
   }
 }
 
+function manualPaybillPayload(extra={}){
+  return {...extra,paymentStartRequired:false,mpesaDemo:false,manualPaymentOnly:true,mpesaMessage:"Pay manually by M-Pesa PayBill, then submit the 10-character M-Pesa confirmation code for Amy to confirm."};
+}
+
 async function initiateMpesa(phone,amount,accountRef) {
   if(process.env.ONLINE_TEST==="true") return {demo:true, checkoutRequestId:"DEMO-"+crypto.randomUUID()};
   const key=process.env.MPESA_CONSUMER_KEY;
@@ -1089,6 +1094,9 @@ app.post("/api/bookings/private",requireAuth,async(req,res)=>{
   if(creditAvailable>0){
     return res.json({bookingRef,id,amount:price,holdExpiresAt:holdExpires,firstAppointment:isFirstAppointmentForDog(petId),creditAvailable,creditApplied:0,paymentStartRequired:true,mpesaDemo:false,mpesaMessage:"Client credit is available. Apply it first, or continue with M-Pesa."});
   }
+  if(!STK_PUSH_ENABLED){
+    return res.json(manualPaybillPayload({bookingRef,id,amount:price,holdExpiresAt:holdExpires,firstAppointment:isFirstAppointmentForDog(petId),creditAvailable:0,creditApplied:0,type:"private"}));
+  }
   try {
     const payPhone=req.user.mpesa_phone||req.user.phone;
     const mpesa=await initiateMpesa(payPhone,price,bookingRef);
@@ -1245,7 +1253,7 @@ app.post("/api/classes/:id/enrol",requireAuth,(req,res)=>{
     const current=db.prepare("SELECT * FROM class_enrolments WHERE id=?").get(enrolmentId);
     logClassEnrolmentEvent(current,previous?"re_enrolled":"enrolled",{actorRole:"client",note:`${pet.name} ${previous?"re-enrolled":"enrolled"} in ${c.title}.`});
     logActivity({userId:req.user.id,petId,classId:c.id,actorUserId:req.user.id,actorRole:"client",action:previous?"class_re_enrolled":"class_enrolled",details:`${pet.name} ${previous?"re-enrolled":"enrolled"} in ${c.title}.`});
-    res.json({bookingRef,amount:c.price,creditAvailable:clientCreditBalance(req.user.id),creditApplied:0,mpesaDemo:true,mpesaMessage:"Trial mode: complete the trial payment to confirm enrolment."});
+    res.json(manualPaybillPayload({bookingRef,amount:c.price,creditAvailable:clientCreditBalance(req.user.id),creditApplied:0,type:"class"}));
   } catch(e) {
     if(String(e.message||"").includes("uq_class_pet_active")||String(e.message||"").includes("UNIQUE constraint failed: class_enrolments.class_id, class_enrolments.pet_id")){
       return res.status(409).json({error:`${pet.name} is already enrolled in this course.`});
@@ -1279,8 +1287,9 @@ app.post("/api/my/classes/:ref/resume-payment",requireAuth,(req,res)=>{
     creditAvailable,
     creditApplied:used,
     paymentStartRequired:false,
-    mpesaDemo:true,
-    mpesaMessage:"Demo payment mode: complete the trial payment.",
+    mpesaDemo:false,
+    manualPaymentOnly:true,
+    mpesaMessage:"Pay manually by M-Pesa PayBill, then submit the 10-character M-Pesa confirmation code for Amy to confirm.",
     type:"class",
     petId:e.pet_id,
     classId:e.class_id,
@@ -2125,7 +2134,8 @@ app.post("/api/my/bookings/:id/accept-provisional",requireAuth,async(req,res)=>{
  if(expiryIsPast(b.hold_expires_at))return res.status(409).json({error:"The 24-hour hold has expired. Please contact Amy or book again."});
  const pkg=b.package_id?db.prepare("SELECT * FROM booking_packages WHERE id=? AND user_id=?").get(b.package_id,req.user.id):null;
  const amount=pkg?Number(pkg.package_price):Number(b.price),reference=pkg?`PKG-${pkg.id}`:b.booking_ref,creditAvailable=clientCreditBalance(req.user.id);
- if(creditAvailable>0)return res.json({bookingRef:reference,id:b.id,packageId:pkg?.id||null,amount,holdExpiresAt:b.hold_expires_at,firstAppointment:isFirstAppointmentForDog(b.pet_id),creditAvailable,creditApplied:Number(pkg?.credit_applied||b.credit_applied||0),paymentStartRequired:true,mpesaDemo:false,mpesaMessage:"Client credit is available. Apply it first, or continue with M-Pesa.",type:pkg?'package':'private'});
+ if(creditAvailable>0)return res.json(manualPaybillPayload({bookingRef:reference,id:b.id,packageId:pkg?.id||null,amount,holdExpiresAt:b.hold_expires_at,firstAppointment:isFirstAppointmentForDog(b.pet_id),creditAvailable,creditApplied:Number(pkg?.credit_applied||b.credit_applied||0),type:pkg?'package':'private'}));
+ if(!STK_PUSH_ENABLED)return res.json(manualPaybillPayload({bookingRef:reference,id:b.id,packageId:pkg?.id||null,amount,holdExpiresAt:b.hold_expires_at,firstAppointment:isFirstAppointmentForDog(b.pet_id),creditAvailable:0,creditApplied:Number(pkg?.credit_applied||b.credit_applied||0),type:pkg?'package':'private'}));
  try{
   const mpesa=await initiateMpesa(req.user.mpesa_phone||req.user.phone,amount,reference);
   if(pkg)db.prepare("UPDATE booking_packages SET mpesa_request_id=? WHERE id=?").run(mpesa.checkoutRequestId,pkg.id);
@@ -2336,6 +2346,7 @@ app.post("/api/my/bookings/:id/resume-payment",requireAuth,async(req,res)=>{
  const pkg=b.package_id?db.prepare("SELECT * FROM booking_packages WHERE id=? AND user_id=?").get(b.package_id,req.user.id):null;
  const total=pkg?Number(pkg.package_price||0):Number(b.price||0),used=pkg?Number(pkg.credit_applied||0):Number(b.credit_applied||0),amount=Math.max(0,total-used),reference=pkg?`PKG-${pkg.id}`:b.booking_ref;
  if(amount<=0)return res.json({bookingRef:reference,id:b.id,packageId:pkg?.id||null,amount:0,creditAvailable:clientCreditBalance(req.user.id),settled:true,type:pkg?'package':'private'});
+ if(!STK_PUSH_ENABLED)return res.json(manualPaybillPayload({bookingRef:reference,id:b.id,packageId:pkg?.id||null,amount,holdExpiresAt:b.hold_expires_at,firstAppointment:isFirstAppointmentForDog(b.pet_id),creditAvailable:clientCreditBalance(req.user.id),creditApplied:used,type:pkg?'package':'private'}));
  try{
   const m=await initiateMpesa(req.user.mpesa_phone||req.user.phone,amount,reference);
   if(pkg)db.prepare("UPDATE booking_packages SET mpesa_request_id=? WHERE id=?").run(m.checkoutRequestId,pkg.id);

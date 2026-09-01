@@ -1320,3 +1320,20 @@ input[type="password"]{text-transform:none!important}
 /* v21.9.16q course start + duration */
 .class-duration-choice{margin-bottom:12px}
 .class-selected-time{margin:10px 0 0}
+
+
+/* v21.9.16u manual PayBill payment */
+.paybill-payment-box{margin-top:16px}
+.paybill-quick-grid{display:grid;grid-template-columns:minmax(160px,220px) 1fr;gap:18px;align-items:start;margin:14px 0}
+.paybill-qr{text-align:center}
+.paybill-qr img{display:block;width:min(100%,220px);height:auto;margin:0 auto 8px;border-radius:10px;background:#fff;padding:8px}
+.paybill-qr small,.paybill-details small{display:block;line-height:1.4}
+.paybill-details{display:grid;gap:10px}
+.paybill-details>div{display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:baseline;padding-bottom:7px;border-bottom:1px solid rgba(37,33,94,.12)}
+.paybill-details span{font-size:.88rem}
+.paybill-details strong{font-size:1.08rem}
+.paybill-app-link{display:inline-flex;justify-content:center;text-decoration:none;margin-top:3px}
+.paybill-instructions{margin:14px 0;padding:10px 12px;border:1px solid rgba(37,33,94,.15);border-radius:10px}
+.paybill-instructions summary{cursor:pointer;font-weight:650}
+.paybill-instructions ol{margin-bottom:0}
+@media(max-width:620px){.paybill-quick-grid{grid-template-columns:1fr}.paybill-qr img{width:min(72vw,220px)}.paybill-details>div{grid-template-columns:90px 1fr}}

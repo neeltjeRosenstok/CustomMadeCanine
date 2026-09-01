@@ -1,12 +1,12 @@
-The Custom Made Canine v21.9.16s CLEANUP PHASE 1
+The Custom Made Canine v21.9.16u ONLINE TEST
 
-Structural cleanup only. No intended functional changes.
+Manual M-Pesa PayBill phase:
+- Automatic STK Push is hidden and disabled by default, but its integration code is retained behind STK_PUSH_ENABLED=true for future use.
+- Live client payment flow is manual PayBill.
+- PayBill 542542; Account 727777; The Custom Made Canine (Amy L Rapp).
+- Added the supplied QR code to the payment screen.
+- Added a Safaricom One App launch link and complete PayBill instructions.
+- Client still submits the exact 10-character M-Pesa confirmation code; Amy still verifies it.
+- Credit handling remains available.
 
-- Frozen functional baseline: v21.9.16r1.
-- Removed 27 earlier overridden function declarations from public/app.js.
-- Preserved the exact final active definition for all 26 duplicate function names.
-- Reduced named function declarations from 348 to 321, while preserving the same 321-function name set.
-- No database changes.
-- No booking, payment, class, resource, calendar or client-flow behavior intentionally changed.
-
-This is deliberately phase 1 only. Server/backend consolidation is not included yet.
+No database reset required.

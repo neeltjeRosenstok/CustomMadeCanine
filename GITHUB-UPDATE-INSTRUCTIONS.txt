@@ -1,4 +1,4 @@
-v21.9.16s CLEANUP PHASE 1
+v21.9.16u MANUAL PAYBILL
 
 Replace:
 - server.js
@@ -6,17 +6,16 @@ Replace:
 - VERSION.txt
 - GITHUB-UPDATE-INSTRUCTIONS.txt
 - public/app.js
+- public/styles.css
 - public/index.html
+- public/mpesa-paybill-qr.png
 
-No database reset.
+Do NOT reset the database.
 
-Focused regression check after deploy:
-1. Amy login -> Trainer Dashboard.
-2. Client login -> Client Portal.
-3. Manual M-Pesa reference remains uppercase/alphanumeric/exactly 10 characters and shows the new Awaiting confirmation wording.
-4. Cancel a test course enrolment.
-5. Open Resource Library and one Scheduled Class.
-6. Open month/day calendar and one private booking.
-7. Refresh both trainer and client sessions once.
-
-If those pass, use this as the cleaned frontend baseline before phase 2/backend consolidation.
+Focused test:
+1. Create/resume a pending private booking and a class enrolment.
+2. Confirm no STK Push is sent.
+3. Confirm PayBill 542542, Account 727777 and the QR are visible.
+4. Confirm the 10-character M-Pesa code caps at 10, uppercases, and submits for Amy verification.
+5. Test the Safaricom One App button on Android and iPhone; it should open Safaricom's One App/web destination, but PayBill fields may still need manual entry depending on device/app handling.
+6. Confirm Amy receives the manual payment verification item.
