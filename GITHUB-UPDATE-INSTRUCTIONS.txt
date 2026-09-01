@@ -1,7 +1,22 @@
-v21.9.16r1 MANUAL M-PESA LIMIT HOTFIX
+v21.9.16s CLEANUP PHASE 1
 
-Replace server.js, package.json, VERSION.txt, GITHUB-UPDATE-INSTRUCTIONS.txt, public/app.js and public/index.html.
+Replace:
+- server.js
+- package.json
+- VERSION.txt
+- GITHUB-UPDATE-INSTRUCTIONS.txt
+- public/app.js
+- public/index.html
 
-Do NOT reset the database.
+No database reset.
 
-Focused test: manual M-Pesa field must keep only uppercase letters/numbers, stop at 10 characters, and reject fewer than 10 on submit. Confirm course cancellation still works.
+Focused regression check after deploy:
+1. Amy login -> Trainer Dashboard.
+2. Client login -> Client Portal.
+3. Manual M-Pesa reference remains uppercase/alphanumeric/exactly 10 characters and shows the new Awaiting confirmation wording.
+4. Cancel a test course enrolment.
+5. Open Resource Library and one Scheduled Class.
+6. Open month/day calendar and one private booking.
+7. Refresh both trainer and client sessions once.
+
+If those pass, use this as the cleaned frontend baseline before phase 2/backend consolidation.

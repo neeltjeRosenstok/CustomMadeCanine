@@ -1,8 +1,12 @@
-The Custom Made Canine v21.9.16r1 ONLINE TEST
+The Custom Made Canine v21.9.16s CLEANUP PHASE 1
 
-Tiny pre-cleanup hotfix:
-- Restores strict live manual M-Pesa reference entry: uppercase alphanumeric only, maximum 10 characters.
-- Server-side exact 10-character validation remains in place.
-- Whole-course cancellation fix from v21.9.16r is unchanged.
+Structural cleanup only. No intended functional changes.
 
-No database reset required.
+- Frozen functional baseline: v21.9.16r1.
+- Removed 27 earlier overridden function declarations from public/app.js.
+- Preserved the exact final active definition for all 26 duplicate function names.
+- Reduced named function declarations from 348 to 321, while preserving the same 321-function name set.
+- No database changes.
+- No booking, payment, class, resource, calendar or client-flow behavior intentionally changed.
+
+This is deliberately phase 1 only. Server/backend consolidation is not included yet.

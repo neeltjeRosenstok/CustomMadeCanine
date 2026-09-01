@@ -173,16 +173,7 @@ function dogClassEligibility(p,c){
  if(c.max_age_months!=null&&months>Number(c.max_age_months))return {ok:false,code:"age",label:`${months} months · too old`};
  return {ok:true,label:`${months} months at course start`};
 }
-function classDetails(){
- const c=state.selectedClass;
- return `<div><div class="eyebrow">${c.sessions.length}-session course</div><h2>${esc(c.title)}</h2><p>${esc(c.description)}</p>
- <div class="notice">All ${c.sessions.length} sessions are included. Individual class dates cannot be changed and new clients cannot join after the course starts.</div>
- <div class="class-age-rule">Age range at course start: ${esc(classAgeLabel(c))}</div>
- <div class="list">${c.sessions.map((s,i)=>`<div class="kpi"><span>Class ${i+1}</span><span>${new Date(s.session_date+"T12:00:00").toLocaleDateString("en-KE",{weekday:"short",day:"numeric",month:"short"})} · ${s.start_time}–${s.end_time}</span></div>`).join("")}</div>
- ${state.user?dogPicker("class"):"<div class=\"notice\">Your dog will be selected after you sign in or create your client account. Your course choice is saved.</div>"}
- <div class="actions"><button class="primary" ${state.user&&!state.selectedPet?"disabled":""} onclick="joinClass()">Take part in Class · ${money(c.price)}</button></div>
- </div>`;
-}
+/* cleanup: overridden classDetails declaration removed */
 function startPrivate(origin){state.bookingOrigin=origin||"home";state.selectedService=null;state.selectedLocation=null;state.selectedDate=null;state.slots=[];state.selectedSlot=null;state.selectedPet=null;state.selectedDayStatus=null;go("private")}
 function dogPicker(context){
  const pets=(state.profile?.pets||[]).filter(p=>!p.archived);
@@ -193,31 +184,11 @@ function dogPicker(context){
  ${state.showAddPet&&state.addPetBookingContext===context?addDogModal():""}
  </div>`;
 }
-function selectPetForBooking(id){state.selectedPet=Number(id);render()}
+/* cleanup: overridden selectPetForBooking declaration removed */
 function startAddDogFromBooking(context){state.addPetBookingContext=context;state.showAddPet=true;state.editPet=null;render()}
 function closeAddDogModal(){state.showAddPet=false;state.addPetBookingContext=null;render()}
-function selectPetForBooking(id){state.selectedPet=Number(id);render()}
-function privateView(){
- return `<section class="screen"><button class="back" onclick="go(bookingBackView())">← Back</button><div class="two-col">
- <div><h2>Private Training</h2><p class="page-subtitle">One-on-One training at home or at Amy’s arena</p><div class="card-grid">
-  ${serviceCard("consultation","Initial consultation","90 minutes · KES 5,000")}
-  ${serviceCard("standard","Training session","60 minutes · KES 4,000")}
-  ${serviceCard("extra","Training + extra time","90 minutes · KES 6,000")}
- </div>
- <h3 style="margin-top:14px">Where?</h3><div class="actions" style="margin-top:5px">
-  <button class="${state.selectedLocation==="arena"?"primary":"secondary"}" onclick="pickLocation('arena')">Amy's arena</button>
-  <button class="${state.selectedLocation==="home"?"primary":"secondary"}" onclick="pickLocation('home')">At my home</button>
- </div>
- ${state.selectedLocation==="home"?`<label style="margin-top:12px">Home address<input id="address" value="${esc(state.address||"")}" placeholder="Estate, road, Nairobi" oninput="state.address=this.value;updatePrivateContinueState()"></label>`:""}
- <label style="margin-top:12px">Date<input type="date" id="privateDate" value="${state.selectedDate||""}" min="${earliestPrivateDate()}" aria-describedby="dateHelp"></label>
- <div class="actions" style="margin-top:8px"><button type="button" class="secondary" onclick="checkAvailability()">Check available times</button></div>
- <p id="dateHelp" class="small">The earliest appointment is tomorrow. Choose a date, then select Check available times. You can check availability before signing in.</p>
- </div>
- <div class="panel"><h2>Choose a time</h2>${state.selectedDayStatus?.restrictionMessage?`<div class="notice service-client-message">${esc(state.selectedDayStatus.restrictionMessage)}</div>`:""}${state.slots.length?`<div class="time-grid">${state.slots.map(s=>`<button class="time ${state.selectedSlot?.start===s.start?"selected":""}" onclick='selectSlot(${JSON.stringify(s)})'>${String(s.start).slice(11,16)}${s.travelMinutes?`<small><br>${s.travelMinutes} min travel</small>`:""}</button>`).join("")}</div>`:`<div class="center"><p>${state.selectedService&&state.selectedLocation&&state.selectedDate?"No suitable times are available on this date.":"Choose a service, location and date."}</p></div>`}
- ${state.selectedSlot?(state.user?dogPicker("private"):`<div class="notice"><b>Your dog will be selected after you sign in or create your client account.</b><br>Your training choices are saved.</div>`):""}
- ${state.selectedSlot?`${state.user&&state.selectedLocation==="home"?`<p id="privateAddressNeeded" class="notice" ${privateAddressReady()?"hidden":""}>Add the home address above to continue.</p>`:""}<div class="actions"><button id="privateContinueBtn" class="primary" ${state.user&&(!state.selectedPet||!privateAddressReady())?"disabled":""} onclick="confirmPrivate()">Continue to details</button></div>`:""}
- </div></div></section>`;
-}
+/* cleanup: overridden selectPetForBooking declaration removed */
+/* cleanup: overridden privateView declaration removed */
 function serviceCard(id,title,desc){
  return `<button type="button" class="choice ${state.selectedService===id?"selected":""}" aria-pressed="${state.selectedService===id}" onclick="changePrivateService('${id}')"><strong>${title}</strong><span>${desc}</span><span class="choice-status">${state.selectedService===id?"✓ Selected":"Select this option"}</span></button>`;
 }
@@ -266,26 +237,7 @@ function bookingSavedSummary(){
  if(state.address && state.selectedLocation==="home")parts.push(state.address);
  return parts;
 }
-function authView(){
- const parts=bookingSavedSummary();
- const hasBooking=!!(state.selectedService||state.selectedClass);
- return `<section class="screen"><button class="back" onclick="go(state.selectedService?'private':'classes')">← Back to booking</button><div class="center"><div class="panel auth-panel">
- <div class="eyebrow">One quick step</div><h2>${hasBooking?"Your booking is saved":"Client Portal"}</h2>
- ${hasBooking?`<div class="notice good saved-notice"><b>✓ All your changes have been saved.</b><br>Your booking choices will stay here while you sign in or create your client account.</div>`:""}
- <p class="auth-message">${esc(state.authMessage||"To continue, choose the option that applies to you.")}</p>
- ${state.authMode==="choice"?`<div class="auth-choice-grid">
-   <button class="auth-choice" onclick="state.authMode='login';render()"><span class="auth-choice-icon">↪</span><strong>I already have an account</strong><span>Sign in to continue with your saved booking.</span></button>
-   <button class="auth-choice" onclick="state.authMode='register';render()"><span class="auth-choice-icon">＋</span><strong>I'm a new client</strong><span>Create an account to continue. It only takes a moment.</span></button>
- </div>`:`<button class="back auth-back" onclick="state.authMode='choice';render()">← Choose another option</button>
- ${state.authMode==="register"?`<label>Name<input id="authName" autocomplete="name"></label>`:""}
- <label>Email<input id="authEmail" type="email" autocomplete="email" value="${esc(localStorage.getItem("cmc_last_email")||"")}"></label>
- ${state.authMode==="register"?`<label>Mobile / M-Pesa number<input id="authPhone" placeholder="2547..." autocomplete="tel"></label>`:""}
- <label>Password<input id="authPassword" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="current-password"></label>
- <div class="actions"><button class="primary" onclick="submitAuth()">${state.authMode==="register"?"Create my account":"Sign in and continue"}</button></div>
- ${state.authMode==="login"?`<button class="text-button" onclick="showForgotPassword()">Forgot your password?</button>
- ${localStorage.getItem("cmc_last_email")?`<div class="notice compact"><b>Email remembered:</b> ${esc(localStorage.getItem("cmc_last_email"))}. Your password is never stored here.</div>`:""}`:""}` }
- </div></div></section>`;
-}
+/* cleanup: overridden authView declaration removed */
 function showForgotPassword(){
  state.authMode="forgot"; state.menu=false; render();
 }
@@ -326,90 +278,17 @@ async function completeReset(){
  localStorage.setItem("cmc_last_email",email); state.authMode="login"; state.authMessage="Your password has been reset. You can now sign in."; render();
  }catch(e){appAlert(e.message)}
 }
-async function submitAuth(){
- try{
-  const body={email:document.getElementById("authEmail").value.trim(),password:document.getElementById("authPassword").value};
-  if((state.authMode||"login")==="register"){body.name=document.getElementById("authName").value;body.phone=document.getElementById("authPhone").value}
-  localStorage.setItem("cmc_last_email",body.email);
-  const d=await api(`/api/auth/${(state.authMode||"login")==="register"?"register":"login"}`,{method:"POST",body:JSON.stringify(body)});
-  state.user=d.user;
-  if(state.user.role==="trainer"){
-    state.authReturnToBooking=false;state.menu=false;state.trainer=await api("/api/trainer/summary");await loadTrainerCalendar(new Date());await loadTrainerMonth(new Date());state.serviceAvailability=await api("/api/trainer/service-availability");go("trainer");
-  }else{
-    state.profile=await api("/api/my/profile");
-    if(state.authReturnToBooking){
-      state.authReturnToBooking=false;
-      if(state.selectedClass) go("classes"); else if(state.selectedService) go("private"); else await portal();
-    }else{
-      clearBookingDraft();
-      await portal();
-    }
-  }
- }catch(e){appAlert(e.message)}
-}
+/* cleanup: overridden submitAuth declaration removed */
 function clearBookingDraft(){
  state.selectedService=null;state.selectedLocation=null;state.selectedDate=null;state.slots=[];state.selectedSlot=null;state.selectedClass=null;state.selectedPet=null;state.address="";state.confirm=null;
 }
 function privateAddressReady(){return state.selectedLocation!=="home"||!!String(state.address||"").trim()}
-function updatePrivateContinueState(){
- const v=document.getElementById("address")?.value||"";state.address=v;const btn=document.getElementById("privateContinueBtn"),note=document.getElementById("privateAddressNeeded");
- if(btn)btn.disabled=!!state.user&&(!state.selectedPet||!privateAddressReady());if(note)note.hidden=privateAddressReady();
-}
-async function confirmPrivate(){
- if(!state.user)return auth("Your time is selected. Please sign in or create an account to continue to payment.");
- if(!state.selectedPet)return appAlert("Please select which dog this training is for.");
- const address=document.getElementById("address")?.value||state.address||"";
- state.address=address;if(state.selectedLocation==="home"&&!address.trim())return appAlert("Please add the home address before continuing.");
- const d=await api("/api/bookings/private",{method:"POST",body:JSON.stringify({
-  service:state.selectedService,locationType:state.selectedLocation,address,startAt:state.selectedSlot.start,petId:state.selectedPet
- })});
- state.confirm={...d,type:"private",service:state.selectedService,locationType:state.selectedLocation,address,startAt:state.selectedSlot.start,endAt:state.selectedSlot.end};go("payment");
-}
-async function joinClass(){
- if(!state.user)return auth("Your place is selected. Please sign in or create an account to continue to payment.");
- if(!state.selectedPet)return appAlert("Please select which dog this class is for.");
- const pet=(state.profile?.pets||[]).find(p=>p.id===state.selectedPet);
- if(!pet||pet.archived)return appAlert("Please select an active dog.");
- const eligibility=dogClassEligibility(pet,state.selectedClass);
- if(!eligibility.ok){
-   if(eligibility.code==="dob"){appAlert(`Please add ${pet.name}'s date of birth in the Dogs area before joining this age-restricted course.`);state.portalTab="dogs";return portal();}
-   return appAlert(`${pet.name} does not meet this course's age range.`);
- }
- try{
-  const d=await api(`/api/classes/${state.selectedClass.id}/enrol`,{method:"POST",body:JSON.stringify({petId:state.selectedPet})});
-  state.confirm={...d,type:"class",classId:state.selectedClass.id};go("payment");
- }catch(e){if(e.code==="DOB_REQUIRED"){state.portalTab="dogs";appAlert(e.message);return portal();}appAlert(e.message)}
-}
-function paymentView(){
- const c=state.confirm;
- return `<section class="screen"><div class="center"><div class="panel" style="width:min(620px,100%)">
- <div class="eyebrow">Almost there</div><h1 style="font-size:48px">M-Pesa</h1>
- <p class="lead">${esc(c.mpesaMessage||"Approve the payment on your phone.")}</p>
- <div class="notice"><b>Reference:</b> ${esc(c.bookingRef)}<br><b>Amount:</b> ${money(c.amount)}</div>
- ${c.mpesaDemo?`<button class="primary" onclick="demoPay()">Confirm trial payment</button>`:`<p class="small">After payment, return here. Your booking will be confirmed when the M-Pesa callback is received.</p>`}
- </div></div></section>`;
-}
-async function demoPay(){
- const c=state.confirm;
- await api(`/api/${c.type==="private"?"bookings":"classes"}/${c.bookingRef}/demo-pay`,{method:"POST"});
- state.completedBooking={...c};
- state.selectedService=null;state.selectedLocation=null;state.selectedDate=null;state.slots=[];state.selectedSlot=null;state.selectedClass=null;state.address="";
- go("confirmation");
-}
-function confirmationView(){
- const c=state.completedBooking||state.confirm||{};
- const isClass=c.type==="class";
- const title=isClass?(state.selectedClass?.title||"Five-class course"):privateServiceLabel(c.service);
- const dog=state.profile?.pets?.find(p=>p.id===state.selectedPet)?.name;
- return `<section class="screen"><div class="center"><div style="max-width:700px">
- <div class="eyebrow">Booking confirmed</div><h1>You're booked.</h1>
- <p class="lead">${esc(title)}${dog?` · ${esc(dog)}`:""}</p>
- <div class="notice good"><b>Payment received.</b><br>Keep your booking reference <b>${esc(c.bookingRef)}</b>.</div>
- <div class="actions calendar-actions">${isClass?`<button class="primary" onclick="addClassCalendarFromConfirmation()">＋ Add all 5 classes to calendar</button>`:`<button class="primary" onclick="addPrivateCalendarFromConfirmation()">＋ Add to calendar</button>`}</div>
- <p class="small">The calendar file works with Google Calendar, Apple Calendar, Outlook and most calendar apps.</p>
- <div class="actions confirmation-actions"><button class="primary" onclick="portal()">Return to Client Portal</button></div>
- </div></div></section>`;
-}
+/* cleanup: overridden updatePrivateContinueState declaration removed */
+/* cleanup: overridden confirmPrivate declaration removed */
+/* cleanup: overridden joinClass declaration removed */
+/* cleanup: overridden paymentView declaration removed */
+/* cleanup: overridden demoPay declaration removed */
+/* cleanup: overridden confirmationView declaration removed */
 function privateServiceLabel(id){return id==="consultation"?"Initial consultation":id==="extra"?"Training + extra time":"Training session"}
 function icsEscape(value){return String(value||"").replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n")}
 function icsDate(value){const d=new Date(value);return d.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,"Z")}
@@ -517,11 +396,7 @@ function reviewPage(){return `<h3>Leave a review</h3><label>Rating<select id="re
 function accountInline(){return `<p>Use the Account button above to manage your account.</p>`}
 function floatingWhatsapp(){return `<button class="floating-whatsapp" onclick="contactAmy()">WhatsApp Amy</button>`}
 
-function bookingsView(b){
- const privateRows=Array.isArray(b?.privateBookings)?b.privateBookings:[];
- const classRows=Array.isArray(b?.classBookings)?b.classBookings:[];
- return `<div class="list">${privateRows.map(x=>`<div class="card ${x.status==="provisional"?"provisional-card":""}"><h3>${x.status==="provisional"?"Action required · ":""}Private training · ${esc(x.pet_name||'Dog not recorded')}</h3><p>${fmt(x.start_at)} · ${x.location_type==='home'?'Home visit':"Amy's Arena in Ridgeways"}</p><p>${esc(x.booking_ref)} · ${x.status==="provisional"?"Awaiting your confirmation and payment":esc(x.payment_status)}${x.status==='cancelled'?' · Cancelled':''}${x.refund_amount?` · Refund KES ${Number(x.refund_amount).toLocaleString()}`:""}</p>${x.status==="provisional"?`<div class="notice">Amy has proposed this appointment. Confirm the time and pay with M-Pesa to secure it.</div><div class="actions"><button class="primary compact-button" onclick="acceptProvisional(${x.id})">Confirm & Pay</button><button class="secondary compact-button" onclick="declineProvisional(${x.id})">Decline</button></div>`:""}${x.status==="cancelled"&&x.payment_status==="refund_pending"?`<div class="notice">Cancellation received. Amy needs to record the refund or alternative arrangement.</div>`:""}${x.payment_status==="refund_partial"||x.payment_status==="refunded"?`<div class="notice good">${x.payment_status==="refunded"?"Refunded":"Partially refunded"} KES ${Number(x.refund_amount||0).toLocaleString()}${x.refund_confirmation_code?` · M-Pesa ${esc(x.refund_confirmation_code)}`:""}</div>`:""}${['paid','demo_paid','credit_paid'].includes(x.payment_status)&&!bookingIsInactive(x,'private')?`<div class="actions"><button class="secondary compact-button" onclick="addPrivateCalendarByRef('${esc(x.booking_ref)}')">＋ Add to calendar</button><button class="secondary compact-button" onclick="clientReschedule(${x.id})">Reschedule</button><button class="danger compact-button" onclick="clientCancel(${x.id})">Cancel</button></div>`:''}</div>`).join('')}${classRows.map(x=>`<div class="card ${["rejected","cancelled_by_client"].includes(x.enrolment_status)?"class-rejected-card":""}"><h3>${esc(x.title)} · ${esc(x.pet_name||"Dog not recorded")}</h3><p>${displayDate(x.start_date,{day:"numeric",month:"short",year:"numeric"})}–${displayDate(x.end_date,{day:"numeric",month:"short",year:"numeric"})} · ${esc(x.start_time||"")}–${esc(x.end_time||"")}</p><p>${esc(x.booking_ref)} · ${x.enrolment_status==="cancelled_by_client"?"Cancellation sent to Amy":x.enrolment_status==="rejected"?"Enrolment cancelled":esc(x.payment_status)}</p>${["rejected","cancelled_by_client"].includes(x.enrolment_status)?`<div class="notice ${x.enrolment_status==="rejected"?"bad":""}">${x.enrolment_status==="cancelled_by_client"?"Your class place has been cancelled and Amy has been notified.":x.rejected_reason?`Amy's note: ${esc(x.rejected_reason)}`:"This class enrolment has been cancelled."}${x.payment_status==="refund_pending"?" A refund decision is pending.":""}${["refunded","refund_partial"].includes(x.payment_status)?` Refund recorded: KES ${Number(x.refund_amount||0).toLocaleString()}.`:""}</div>`:""}${x.enrolment_status==="active"&&["paid","demo_paid","credit_paid"].includes(x.payment_status)&&String(x.end_date||"")>=nairobiDateKeyClient(0)?`<div class="actions"><button class="secondary compact-button" onclick="addClassCalendarByRef('${esc(x.booking_ref)}')">＋ Add all classes to calendar</button><button class="danger compact-button" onclick="clientCancelClass(${x.id})">Cancel course enrolment</button></div>`:""}</div>`).join('')}${!privateRows.length&&!classRows.length?'<div class="center"><p>No bookings yet.</p></div>':''}</div>`;
-}
+/* cleanup: overridden bookingsView declaration removed */
 async function clientCancelClass(id){
  const enrolment=(state.bookings?.classBookings||[]).find(x=>Number(x.id)===Number(id));
  const course=String(enrolment?.title||"this course");
@@ -541,10 +416,7 @@ async function declineProvisional(id){
  if(!await appConfirm("Do not accept this proposed booking/package? The held time(s) will be released."))return;
  try{await api(`/api/my/bookings/${id}/decline-provisional`,{method:"POST",body:JSON.stringify({})});await portal();}catch(e){appAlert(e.message)}
 }
-function clientReschedule(id){
- const b=(state.bookings?.privateBookings||[]).find(x=>x.id===id);if(!b)return;
- state.rescheduleDraft={bookingId:id,booking:b,date:String(b.start_at).slice(0,10),slots:[],selected:null};render();
-}
+/* cleanup: overridden clientReschedule declaration removed */
 async function loadRescheduleSlots(){
  const r=state.rescheduleDraft;if(!r)return;
  const date=document.getElementById("rescheduleDate")?.value||r.date;
@@ -561,7 +433,7 @@ async function loadRescheduleSlots(){
 }
 
 function chooseRescheduleSlot(slot){state.rescheduleDraft.selected=slot;render()}
-async function confirmClientReschedule(){const r=state.rescheduleDraft;if(!r?.selected)return;try{await api(`/api/my/bookings/${r.bookingId}/reschedule`,{method:"POST",body:JSON.stringify({startAt:r.selected.start})});state.rescheduleDraft=null;await portal();appAlert("Your booking has been rescheduled.")}catch(e){appAlert(e.message)}}
+/* cleanup: overridden confirmClientReschedule declaration removed */
 function closeClientReschedule(){state.rescheduleDraft=null;render()}
 function clientRescheduleModal(){
  const r=state.rescheduleDraft;if(!r)return "";const b=r.booking;
@@ -611,15 +483,7 @@ function petsView(pets){
  const active=(pets||[]).filter(p=>!p.archived),archived=(pets||[]).filter(p=>p.archived);
  return `<div class="pets-layout"><div class="pets-head"><div><h3>My dogs</h3><p class="small">Edit details if something was entered incorrectly. Archive a dog when no new training is needed.</p></div><button class="primary compact-button" onclick="state.addPetBookingContext=null;state.showAddPet=true;state.editPet=null;render()">+ Add a dog</button></div>${active.length?`<div class="pet-grid">${active.map(p=>petCard(p,false)).join("")}</div>`:`<div class="empty-pets"><div class="pet-photo"><span aria-hidden="true">🐕</span></div><div><h3>No active dogs</h3><p class="small">Add a dog or restore one from Archived dogs.</p></div></div>`}${archived.length?`<details class="archived-dogs"><summary>Archived dogs · ${archived.length}</summary><div class="pet-grid">${archived.map(p=>petCard(p,true)).join("")}</div></details>`:""}${state.showAddPet?addDogModal():""}${state.editPet?editDogModal():""}</div>`;
 }
-function addDogModal(){const fromBooking=!!state.addPetBookingContext;return `<div class="pet-add-overlay" role="dialog" aria-modal="true" aria-labelledby="addDogTitle"><div class="pet-add-card"><div class="pet-add-head"><div><div class="eyebrow">${fromBooking?"Booking":"Client profile"}</div><h3 id="addDogTitle">${fromBooking?"Add a dog to this booking":"Add a dog"}</h3></div><button class="close-btn close-light" aria-label="Close add dog form" onclick="closeAddDogModal()">×</button></div>${fromBooking?`<p class="small booking-dog-helper">Your booking choices stay exactly as they are. After saving, this dog will be selected automatically.</p>`:""}
- <div class="form-grid"><label>Name<input id="petName" autocomplete="off"></label><label>Breed<input id="petBreed"></label></div>
- <div class="form-grid dog-demographic-row"><fieldset class="dog-radio-field"><legend>Gender</legend><label class="inline-radio"><input type="radio" name="petGender" value="male"> Male</label><label class="inline-radio"><input type="radio" name="petGender" value="female"> Female</label></fieldset><label class="dog-check-field"><span>Neutered / spayed</span><span class="check-row"><input id="petNeutered" type="checkbox"> Yes</span></label></div>
- <label>Date of birth<input id="petDob" type="date"></label>
- <label>Behaviour notes<textarea id="petBehaviour" rows="2" placeholder="Temperament, triggers, habits, handling notes…"></textarea></label>
- <label>Medical procedures / history<textarea id="petMedical" rows="2" placeholder="Operations or procedures that may matter for training"></textarea></label>
- <label>General notes<textarea id="petNotes" rows="2" placeholder="Anything else Amy should know"></textarea></label>
- <div class="form-grid"><label>Dog photo<input id="petPhoto" type="file" accept="image/jpeg,image/png,image/webp"></label><label>Vaccination pages<input id="petVaccinations" type="file" accept="image/jpeg,image/png,image/webp" multiple></label></div>
- <p class="small">Photo and vaccination pages are optional now; you can add or replace them later.</p><div class="actions"><button class="secondary" onclick="closeAddDogModal()">Cancel</button><button id="saveDogBtn" class="primary" onclick="addPet()">Save dog</button></div></div></div>`}
+/* cleanup: overridden addDogModal declaration removed */
 function editDogModal(){const p=state.editPet;if(!p)return "";return `<div class="pet-add-overlay" role="dialog" aria-modal="true" aria-labelledby="editDogTitle"><div class="pet-add-card"><div class="pet-add-head"><div><div class="eyebrow">Dog profile</div><h3 id="editDogTitle">Edit ${esc(p.name)}</h3></div><button class="close-btn close-light" aria-label="Close edit dog form" onclick="state.editPet=null;render()">×</button></div>
  <div class="form-grid"><label>Name<input id="editPetName" value="${esc(p.name||"")}"></label><label>Breed<input id="editPetBreed" value="${esc(p.breed||"")}"></label></div>
  <div class="form-grid dog-demographic-row"><fieldset class="dog-radio-field"><legend>Gender</legend><label class="inline-radio"><input type="radio" name="editPetGender" value="male" ${p.gender==="male"?"checked":""}> Male</label><label class="inline-radio"><input type="radio" name="editPetGender" value="female" ${p.gender==="female"?"checked":""}> Female</label></fieldset><label class="dog-check-field"><span>Neutered / spayed</span><span class="check-row"><input id="editPetNeutered" type="checkbox" ${p.neutered_spayed?"checked":""}> Yes</span></label></div>
@@ -972,19 +836,8 @@ function filterClientDirectory(){state.clientSearch=document.getElementById("cli
 function clientDirectoryModal(){if(!state.clientDirectoryOpen)return "";const q=(state.clientSearch||"").toLowerCase();const rows=(state.trainerClients||[]).filter(x=>!q||[x.name,x.email,x.phone].some(v=>String(v||"").toLowerCase().includes(q))).slice(0,50);return `<div class="modal-overlay"><div class="trainer-modal client-directory"><button class="close-btn modal-close" onclick="closeClientDirectory()">×</button><div class="eyebrow">Amy's workspace</div><h2>Clients</h2><label>Search clients<input id="clientSearch" value="${esc(state.clientSearch||"")}" oninput="state.clientSearch=this.value;document.querySelectorAll('.client-directory-row').forEach(row=>row.hidden=!row.dataset.search.includes(this.value.toLowerCase()))" placeholder="Name, email or phone"></label><p class="small">Showing up to 50 matches. Search narrows the list instantly.</p><div class="client-directory-list">${rows.map(x=>`<button class="client-directory-row" data-search="${esc(`${x.name} ${x.email} ${x.phone||''}`.toLowerCase())}" onclick="openClientRecord(${x.id})"><b>${esc(x.name)}</b><span>${esc(x.email)}</span><small>${esc(x.phone||'No phone added')}</small></button>`).join("")||'<p>No matching clients.</p>'}</div></div></div>`}
 async function openClientRecord(id){state.clientRecord=await api(`/api/trainer/client/${id}`);render()}
 function closeClientRecord(){state.clientRecord=null;render()}
-function clientRecordModal(){const c=state.clientRecord;if(!c)return "";return `<div class="modal-overlay"><div class="trainer-modal client-record-modal"><button class="close-btn modal-close" onclick="closeClientRecord()">×</button><div class="eyebrow">Client record</div><div class="client-record-title"><div><h2>${esc(c.user.name)}</h2><p>${esc(c.user.email)}${c.user.phone?` · ${esc(c.user.phone)}`:""}</p></div><label class="client-status-mini">Client status<select onchange="setClientStatusFromRecord(${c.user.id},this.value)">${["current","dormant","archived"].map(v=>`<option value="${v}" ${v===(c.user.client_status||"current")?"selected":""}>${v}</option>`).join("")}</select></label></div>
- <h3>Dogs</h3><div class="trainer-dog-records">${(c.pets||[]).map(p=>`<article class="trainer-dog-record ${p.archived?"dog-record-archived":""}"><div class="trainer-dog-title"><div><h4>${esc(p.name)}${p.archived?" · Archived":""}</h4><p>${esc(p.breed||"Dog")}${p.gender?` · ${p.gender==="male"?"Male":"Female"}`:""}${p.date_of_birth?` · DOB ${displayDate(p.date_of_birth,{day:"numeric",month:"short",year:"numeric"})}`:" · DOB not set"}${p.neutered_spayed?" · Neutered/spayed":""}</p></div><button class="secondary compact-button" onclick="openVaccinationReview(${p.id})">${p.vaccination_status==="verified"?"Vaccination verified ✓":"Review vaccination"}</button></div>
- ${p.behavior_notes?`<div class="dog-detail-line"><span>Behaviour</span><p>${esc(p.behavior_notes)}</p></div>`:""}
- ${p.medical_procedures?`<div class="dog-detail-line"><span>Medical procedures / history</span><p>${esc(p.medical_procedures)}</p></div>`:""}
- ${p.notes?`<div class="dog-detail-line"><span>Client notes</span><p>${esc(p.notes)}</p></div>`:""}
- <label class="trainer-private-note">Amy's private notes<textarea id="trainerNotes-${p.id}" rows="3" placeholder="Training observations, follow-up notes, handling reminders…">${esc(p.trainer_notes||"")}</textarea><small>Only Amy can see these notes.</small></label>
- <div class="actions trainer-dog-record-actions"><button class="secondary compact-button" onclick="saveTrainerDogNotes(${p.id})">Save Amy's notes</button></div></article>`).join("")||"<p>No dogs recorded.</p>"}</div>
- <h3>Bookings</h3><p>${(c.bookings||[]).length} private booking(s) on file · ${(c.classes||[]).length} class enrolment(s).</p>
- <div class="actions"><button class="primary" onclick="startTrainerClientBooking(${c.user.id})">＋ Book for this client</button><button class="secondary" onclick="closeClientRecord()">Done</button></div></div></div>`}
-function startTrainerClientBooking(userId){
- const c=state.clientRecord;if(!c||Number(c.user.id)!==Number(userId))return;
- state.trainerClientBooking={userId:Number(userId),petId:c.pets?.find(p=>!p.archived)?.id||null,service:"standard",locationType:"arena",address:"",date:"",selectedSlot:null,availabilityMessage:""};state.trainerClientBookingSlots=[];render();
-}
+/* cleanup: overridden clientRecordModal declaration removed */
+/* cleanup: overridden startTrainerClientBooking declaration removed */
 function invalidateTrainerClientSlots(message=""){if(!state.trainerClientBooking)return;state.trainerClientBookingSlots=[];state.trainerClientBooking.selectedSlot=null;state.trainerClientBooking.availabilityMessage=message}
 async function trainerClientBookingDateChanged(value){const m=state.trainerClientBooking;if(!m)return;m.date=value;invalidateTrainerClientSlots("Checking availability…");render();if(value)await trainerClientBookingCheckTimes()}
 async function trainerClientBookingOptionChanged(field,value){const m=state.trainerClientBooking;if(!m)return;m[field]=value;invalidateTrainerClientSlots("");render();if(m.date&&field!=="address")await trainerClientBookingCheckTimes()}
@@ -995,24 +848,8 @@ async function trainerClientBookingCheckTimes(){
  try{const slots=await api(`/api/trainer/availability?${qs.toString()}`);state.trainerClientBookingSlots=slots;state.trainerClientBooking.selectedSlot=null;if(slots.length){m.availabilityMessage=m.overrideLocation?'Override slots shown. Existing bookings, classes, Amy-unavailable time and travel time are still protected.':'';render();return}let msg=m.overrideLocation?'No safe override slots on this date.':'No availability on this date.';try{const meta=await api(`/api/trainer/day-meta?date=${encodeURIComponent(m.date)}`);if(!meta.working?.enabled)msg="Amy is not working on this date.";else if(!m.overrideLocation&&meta.restrictions?.[m.locationType]?.available===false){const r=meta.restrictions[m.locationType];msg=`${m.locationType==="arena"?"Arena":"Home visits"} unavailable on this date.${r.public_message?` ${r.public_message}`:""}`}}catch(_e){}m.availabilityMessage=msg;render()}catch(e){invalidateTrainerClientSlots(e.message||"Could not check availability.");render()}
 }
 
-function trainerClientBookingModal(){
- const m=state.trainerClientBooking,c=state.clientRecord;if(!m||!c)return "";
- return `<div class="modal-overlay"><div class="trainer-modal"><button class="close-btn modal-close" onclick="state.trainerClientBooking=null;render()">×</button><div class="eyebrow">Book for a client</div><h2>${esc(c.user.name)}</h2><p>Create a provisional appointment. The client will see it in their portal and can Confirm & Pay with M-Pesa.</p>
- <label>Dog<select onchange="state.trainerClientBooking.petId=Number(this.value)">${(c.pets||[]).filter(p=>!p.archived).map(p=>`<option value="${p.id}" ${Number(m.petId)===Number(p.id)?"selected":""}>${esc(p.name)}</option>`).join("")}</select></label>
- <div class="form-grid"><label>Training<select onchange="trainerClientBookingOptionChanged('service',this.value)"><option value="consultation" ${m.service==="consultation"?"selected":""}>Initial consultation · 90 min</option><option value="standard" ${m.service==="standard"?"selected":""}>Training · 60 min</option><option value="extra" ${m.service==="extra"?"selected":""}>Training + extra time · 90 min</option></select></label><label>Location<select onchange="trainerClientBookingOptionChanged('locationType',this.value)"><option value="arena" ${m.locationType==="arena"?"selected":""}>Amy's arena</option><option value="home" ${m.locationType==="home"?"selected":""}>Home visit</option></select></label></div>
- ${m.locationType==="home"?`<label>Address<input value="${esc(m.address||"")}" oninput="state.trainerClientBooking.address=this.value" onchange="trainerClientBookingOptionChanged('address',this.value)" placeholder="Client home address"></label>`:""}
- <div class="form-grid"><label>Date<input type="date" min="${earliestPrivateDate()}" inputmode="none" onkeydown="event.preventDefault()" onbeforeinput="event.preventDefault()" onclick="this.showPicker&&this.showPicker()" value="${esc(m.date||"")}" onchange="trainerClientBookingDateChanged(this.value)"></label><div class="actions align-end"><button class="secondary" onclick="trainerClientBookingCheckTimes()">Check available times</button></div></div>
- ${m.availabilityMessage?`<div class="notice trainer-client-availability-message">${esc(m.availabilityMessage)}</div>`:""}
- <div class="time-grid compact-times">${(state.trainerClientBookingSlots||[]).map(slot=>`<button class="time ${m.selectedSlot?.start===slot.start?"selected":""}" onclick='state.trainerClientBooking.selectedSlot=${JSON.stringify(slot)};state.trainerClientBooking.availabilityMessage="";render()'>${String(slot.start).slice(11,16)}</button>`).join("")}</div>
- <div class="actions"><button class="secondary" onclick="state.trainerClientBooking=null;render()">Cancel</button><button class="primary" ${!m.petId||!m.selectedSlot?"disabled":""} onclick="createTrainerProvisionalBooking()">Create provisional booking</button></div></div></div>`;
-}
-async function createTrainerProvisionalBooking(){
- const m=state.trainerClientBooking;if(!m?.selectedSlot)return;
- try{
-  await api(`/api/trainer/clients/${m.userId}/provisional-booking`,{method:'POST',body:JSON.stringify({petId:m.petId,service:m.service,locationType:m.locationType,address:m.address,startAt:m.selectedSlot.start,requestedDate:m.date})});
-  state.trainerClientBooking=null;state.clientRecord=await api(`/api/trainer/client/${m.userId}`);state.trainer=await api('/api/trainer/summary');await loadTrainerCalendar(new Date());await loadTrainerMonth(new Date());render();appAlert('Provisional booking created. The client can now confirm and pay from their portal.');
- }catch(e){appAlert(e.message)}
-}
+/* cleanup: overridden trainerClientBookingModal declaration removed */
+/* cleanup: overridden createTrainerProvisionalBooking declaration removed */
 
 async function reviewStatus(id,status){await api(`/api/trainer/reviews/${id}/status`,{method:"POST",body:JSON.stringify({status})});state.trainer=await api("/api/trainer/summary");render()}
 async function setVaccinationStatus(petId,status){
@@ -1026,26 +863,7 @@ function closeVaccinationReview(){state.vaccinationReview=null;render()}
 function vaccinationReviewModal(){const d=state.vaccinationReview;if(!d)return '';const files=d.files||[];return `<div class="modal-overlay"><div class="trainer-modal vaccination-review-modal"><button class="close-btn modal-close" aria-label="Close vaccination record" onclick="closeVaccinationReview()">×</button><div class="eyebrow">Vaccination record</div><h2>${esc(d.name||'Dog')}</h2>${files.length?`<p class="small">Look through the uploaded passport page(s) before choosing Verify.</p><div class="vaccination-pages">${files.map((f,i)=>`<figure><img src="${esc(f.url)}" alt="Vaccination passport page ${i+1}"><figcaption>Page ${i+1} · ${esc(f.original_name||'uploaded image')}</figcaption></figure>`).join('')}</div>`:`<div class="notice">No image has been uploaded. Only use Verify if you have physically seen the vaccination record.</div>`}<div class="actions">${d.vaccination_status==='verified'?`<button class="secondary" onclick="setVaccinationStatus(${d.id},'pending')">Undo verification</button>`:`<button class="primary" onclick="setVaccinationStatus(${d.id},'verified')">Verify record</button><button class="danger" onclick="setVaccinationStatus(${d.id},'rejected')">Reject / request replacement</button>`}<button class="secondary" onclick="closeVaccinationReview()">Close</button></div></div></div>`}
 async function viewVaccinationFiles(petId){return openVaccinationReview(petId)}
 function blockTime(){const d=state.trainerSelectedDate||nairobiDateKeyClient(0);state.scheduleModal={mode:"block",target:"amy",startDate:d,endDate:d,allDay:false,startTime:"09:00",endTime:"10:00",reason:"Unavailable",publicMessage:""};render()}
-async function submitScheduleModal(){
- const m=state.scheduleModal;if(!m)return;
- if(m.mode==='block'){
-   if(!m.startDate||!m.endDate)return appAlert('Choose the first and last date.');
-   if(m.endDate<m.startDate)return appAlert('Last date cannot be before first date.');
-   if(!m.allDay&&(!m.startTime||!m.endTime||m.startTime>=m.endTime))return appAlert('Choose valid start and end times.');
-   try{
-     const payload={target:m.target,startDate:m.startDate,endDate:m.endDate,allDay:!!m.allDay,startTime:m.startTime,endTime:m.endTime,reason:m.reason||'Unavailable',publicMessage:m.publicMessage||m.reason||'Unavailable',allowExisting:!!m.quickClose};
-     await api('/api/trainer/schedule-blocks',{method:'POST',body:JSON.stringify(payload)});
-     state.scheduleBlocks=await api('/api/trainer/schedule-blocks');state.scheduleModal=null;state.trainer=await api('/api/trainer/summary');
-     await loadTrainerCalendar(parseDateKey(state.trainerSelectedDate)||new Date());await loadTrainerMonth(parseDateKey(state.trainerMonthDate)||new Date());if(state.trainerSelectedDate)await loadTrainerDayMeta(state.trainerSelectedDate);render();
-   }catch(e){appAlert(e.message)}
-   return;
- }
- const start=document.getElementById('scheduleStart')?.value||m.start;if(!start)return appAlert('Please choose a new start date/time.');
- try{
-   const id=m.bookingId;await api(`${m.mode==='client-reschedule'?'/api/my/bookings/':'/api/trainer/bookings/'}${id}/reschedule`,{method:'POST',body:JSON.stringify({startAt:start})});
-   state.scheduleModal=null;if(m.mode==='client-reschedule'){await portal();appAlert('Your booking has been rescheduled.')}else{await loadTrainerCalendar(parseDateKey(state.trainerSelectedDate)||new Date());closeTrainerBooking();appAlert('Booking rescheduled.')}
- }catch(e){appAlert(e.message)}
-}
+/* cleanup: overridden submitScheduleModal declaration removed */
 function closeScheduleModal(){state.scheduleModal=null;render()}
 function halfHourOptions(selected){const rows=[];for(let h=0;h<24;h++)for(const m of [0,30]){const v=`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;rows.push(`<option value="${v}" ${v===selected?"selected":""}>${v}</option>`)}return rows.join("")}
 async function loadTrainerRescheduleSlots(){
@@ -1132,23 +950,8 @@ async function cancelScheduleBlockFromModal(){
  try{await api(`/api/trainer/schedule-blocks/${id}`,{method:"DELETE"});state.scheduleBlocks=await api("/api/trainer/schedule-blocks");state.scheduleModal=null;await loadTrainerMonth(parseDateKey(state.trainerMonthDate)||new Date());if(state.trainerSelectedDate)await loadTrainerDayMeta(state.trainerSelectedDate);render()}catch(e){appAlert(e.message)}
 }
 
-async function openTrainerAdmin(page){
- state.trainerAdminPage=page;
- if(page==="reviews"){state.reviewAdmin=await api("/api/trainer/reviews")}
- if(page==="clients"){state.clientAdmin=await api("/api/trainer/clients")}
- if(page==="hours"){state.workingHours=await api("/api/trainer/working-hours")}
- if(page==="classes"){state.classAdmin=await api("/api/trainer/classes-detail")}
- if(page==="activity"){state.activityAdmin=await api("/api/trainer/activity")}
- state.view="trainerAdmin";render();
-}
-function trainerAdminView(){
- if(state.trainerAdminPage==="reviews")return reviewAdminView();
- if(state.trainerAdminPage==="clients")return clientAdminView();
- if(state.trainerAdminPage==="hours"||state.trainerAdminPage==="scheduling")return workingHoursView();
- if(state.trainerAdminPage==="classes")return classesAdminView();
- if(state.trainerAdminPage==="activity")return activityAdminView();
- return attentionAdminView();
-}
+/* cleanup: overridden openTrainerAdmin declaration removed */
+/* cleanup: overridden trainerAdminView declaration removed */
 function formatNairobiActivityTime(value){
  const raw=String(value||"").trim();if(!raw)return "";
  const d=new Date(raw.includes("T")?(raw.endsWith("Z")?raw:raw+"Z"):raw.replace(" ","T")+"Z");
@@ -1167,11 +970,7 @@ function reviewAdminDetail(r){
 }
 async function adminReviewStatus(id,status){await api(`/api/trainer/reviews/${id}/status`,{method:"POST",body:JSON.stringify({status})});state.reviewAdmin=await api("/api/trainer/reviews");state.trainer=await api("/api/trainer/summary");render()}
 async function manageReview(id,action){await api(`/api/trainer/reviews/${id}/manage`,{method:"POST",body:JSON.stringify({action})});state.reviewAdmin=await api("/api/trainer/reviews");render()}
-function clientAdminView(){
- const rows=state.clientAdmin||[],groups=["current","dormant","archived"];
- return `<section class="screen admin-screen"><button class="back-dashboard" onclick="dashboardBack()">← Back to Dashboard</button><div class="admin-head"><div><div class="eyebrow">Amy's workspace</div><h2>Clients</h2></div><input class="admin-search" placeholder="Search client or dog" value="${esc(state.clientSearch||'')}" oninput="filterClientAdmin(this.value)"></div>
- <div class="client-groups">${groups.map(g=>`<div class="client-group"><h3>${g[0].toUpperCase()+g.slice(1)} · ${rows.filter(x=>(x.client_status||"current")===g).length}</h3>${rows.filter(x=>(x.client_status||"current")===g).map(x=>`<button class="client-overview-card" data-search="${esc(([x.name,x.email,x.phone,...(x.pets||[]).map(p=>p.name)].join(" ")).toLowerCase())}" onclick="openClientRecord(${x.id})"><span class="client-overview-head"><span><span class="client-overview-name">${esc(x.name)}</span><small>${esc(x.email)}${x.phone?` · ${esc(x.phone)}`:""}</small></span><span class="client-open-arrow">→</span></span><span class="client-dog-table">${(x.pets||[]).filter(p=>!p.archived).length?`<span class="client-dog-table-head"><span>Dog</span><span>Classes</span><span>Private appts</span></span>${(x.pets||[]).filter(p=>!p.archived).map(p=>`<span class="client-dog-table-row"><span><span>${esc(p.name)}</span><small>${p.gender?(p.gender==="male"?"Male":"Female"):"Gender not set"} · ${p.date_of_birth?displayDate(p.date_of_birth,{day:"numeric",month:"short",year:"numeric"}):"DOB not set"}</small></span><span>${Number(p.class_count||0)}</span><span>${Number(p.private_count||0)}</span></span>`).join("")}`:`<span class="small">No active dogs.</span>`}</span></button>`).join("")||'<p class="small">None</p>'}</div>`).join("")}</div>${clientRecordModal()}${trainerClientBookingModal()}</section>`;
-}
+/* cleanup: overridden clientAdminView declaration removed */
 async function setClientStatusFromRecord(id,status){
  try{await api(`/api/trainer/clients/${id}/status`,{method:"POST",body:JSON.stringify({status})});state.clientAdmin=await api("/api/trainer/clients");state.clientRecord=await api(`/api/trainer/client/${id}`);render()}catch(e){appAlert(e.message)}
 }
@@ -1270,19 +1069,7 @@ function blockTimeFromScheduling(){
  const d=document.getElementById("schedulingDayDate")?.value||state.schedulingDate||state.trainerSelectedDate||nairobiDateKeyClient(0);
  state.trainerSelectedDate=d;blockTime();
 }
-function workingHoursView(){
- const d=state.workingHours||{weekly:[],exceptions:[],recurringBlocks:[],dateBlocks:[]},names=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],blocks=state.scheduleBlocks||[];
- return `<section class="screen admin-screen scheduling-screen"><button class="back-dashboard" onclick="dashboardBack()">← Back to Dashboard</button><div class="admin-head"><div><div class="eyebrow">Amy's workspace</div><h2>Scheduling</h2><p>Block time and locations first; normal weekly working hours are kept at the bottom for occasional changes.</p></div></div><div class="scheduling-sections">
- <section class="panel scheduling-section"><div class="scheduling-section-head"><div><span class="schedule-number">1</span><h3>Block time</h3><p>Block Amy completely, the arena only, or home visits only. A block can cover hours on one day, the same hours over several days, or whole days.</p></div><button class="primary compact-button" onclick="blockTime()">＋ Block time</button></div>
- <div class="schedule-block-list">${blocks.map(b=>`<div class="service-block-row future-restriction ${b.target}"><div><span class="restriction-title">${esc(scheduleBlockLabel(b))}</span><small>${esc(scheduleBlockDateLabel(b))}</small><p>${esc(b.reason||"Unavailable")}</p>${b.target!=="amy"&&b.public_message&&b.public_message!==b.reason?`<small>Clients see: ${esc(b.public_message)}</small>`:""}</div><button class="secondary compact-button" onclick="revokeScheduleBlock(${b.id})">Revoke block</button></div>`).join("")||'<p class="small">No new-style blocks are active.</p>'}</div>
- ${(state.serviceAvailability?.blocks||[]).length?`<div class="compact-schedule-list"><h4>Earlier location restrictions</h4>${serviceAvailabilityView()}</div>`:""}
- ${(d.dateBlocks||[]).length?`<div class="compact-schedule-list"><h4>Earlier one-off Amy blocks</h4>${d.dateBlocks.map(x=>`<div class="card compact-card"><span>${displayDate(String(x.start_at).slice(0,10),{weekday:"short",day:"numeric",month:"short",year:"numeric"})}</span> · ${String(x.start_at).slice(11,16)}–${String(x.end_at).slice(11,16)} ${x.reason?`· ${esc(x.reason)}`:""}<button class="secondary compact-button" onclick="deleteOneOffBlock(${x.id})">Remove</button></div>`).join("")}</div>`:""}
- ${(d.recurringBlocks||[]).length?`<div class="compact-schedule-list"><h4>Earlier recurring Amy blocks</h4>${d.recurringBlocks.map(x=>`<div class="card compact-card recurring-block-card"><span>${esc(x.start_time)}–${esc(x.end_time)} · ${esc(x.reason||"Blocked")}</span><small>${formatRecurringWeekdays(x.weekdays)} · ${x.start_date?displayDate(x.start_date,{day:"numeric",month:"short",year:"numeric"}):"Any start date"}${x.end_date?` to ${displayDate(x.end_date,{day:"numeric",month:"short",year:"numeric"})}`:" onward"}</small><button class="secondary compact-button" onclick="revokeRecurringBlock(${x.id})">Revoke</button></div>`).join("")}</div>`:""}</section>
- <section class="panel scheduling-section"><div class="scheduling-section-head"><div><span class="schedule-number">2</span><h3>Working hours</h3><p>Amy's normal weekly pattern. This is the least frequently changed part of Scheduling.</p></div><button class="secondary compact-button" onclick="addWorkingException()">＋ One-off change</button></div>
- <div class="hours-list hours-list-v2176">${d.weekly.map(w=>`<div class="hours-row hours-row-v2176"><label class="check-row hours-day"><input type="checkbox" data-day="${w.weekday}" class="wh-enabled" ${w.enabled?"checked":""}> <span>${names[w.weekday]}</span></label><div class="hours-time-pair"><input type="time" class="wh-start" data-day="${w.weekday}" value="${w.start_time||"08:00"}"><span class="hours-to">to</span><input type="time" class="wh-end" data-day="${w.weekday}" value="${w.end_time||"17:00"}"></div></div>`).join("")}</div><div class="actions"><button class="primary" onclick="saveWorkingHours()">Save weekly hours</button></div>
- <div class="exception-list compact-schedule-list"><h4>One-off working-hour changes</h4>${(d.exceptions||[]).map(x=>`<div class="card compact-card"><span>${displayDate(x.exception_date,{weekday:"short",day:"numeric",month:"short",year:"numeric"})}</span> · ${x.enabled?`${esc(x.start_time)}–${esc(x.end_time)} · extra / changed working hours`:"Unavailable all day"} ${x.note?`· ${esc(x.note)}`:""}<button class="secondary compact-button" onclick="deleteWorkingException(${x.id})">Remove</button></div>`).join("")||'<p class="small">No one-off working-hour changes.</p>'}</div></section>
- </div>${workingExceptionModalView()}${scheduleModalView()}</section>`;
-}
+/* cleanup: overridden workingHoursView declaration removed */
 function pickDateButton(btn){
  const inp=document.createElement('input');inp.type='date';inp.value=btn.dataset.value||'';inp.style.position='fixed';inp.style.opacity='0';document.body.appendChild(inp);
  inp.addEventListener('change',()=>{btn.dataset.value=inp.value;state.scheduleModal.startDate=inp.value;btn.textContent='📅 '+new Date(`${inp.value}T12:00:00`).toLocaleDateString('en-KE',{weekday:'short',day:'numeric',month:'short',year:'numeric'});inp.remove()},{once:true});
@@ -1345,10 +1132,7 @@ function toggleRecurringUntilFurther(el){const m=state.recurringBlockModal;if(!m
 async function saveRecurringBlock(){const m=state.recurringBlockModal;if(!m)return;if(!m.weekdays.length)return appAlert("Choose at least one weekday.");if(!m.start_date)return appAlert("Choose the first date.");if(!m.untilFurtherNotice&&!m.end_date)return appAlert("Choose the last date.");if(m.start_time>=m.end_time)return appAlert("End time must be after start time.");try{await api("/api/trainer/recurring-blocks",{method:"POST",body:JSON.stringify({weekdays:m.weekdays,start_time:m.start_time,end_time:m.end_time,reason:m.reason||"Blocked",start_date:m.start_date,end_date:m.untilFurtherNotice?"":m.end_date})});state.recurringBlockModal=null;state.workingHours=await api("/api/trainer/working-hours");if(state.trainerSelectedDate)await loadTrainerDayMeta(state.trainerSelectedDate);render()}catch(e){appAlert(e.message)}}
 async function revokeRecurringBlock(id){await api(`/api/trainer/recurring-blocks/${id}`,{method:"DELETE"});state.workingHours=await api("/api/trainer/working-hours");render()}
 async function deleteWorkingException(id){await api(`/api/trainer/working-hours/exception/${id}`,{method:'DELETE'});state.workingHours=await api('/api/trainer/working-hours');render()}
-function attentionAdminView(){
- const t=state.trainer||{};
- return `<section class="screen admin-screen"><button class="back-dashboard" onclick="dashboardBack()">← Back to Dashboard</button><div class="admin-head"><div><div class="eyebrow">Amy's workspace</div><h2>Needs attention</h2></div></div><div class="admin-list-large">${(t.vaccinationAttention||[]).map(x=>`<div class="card"><span>Vaccination · ${esc(x.pet_name)}</span><p>${esc(x.client_name)} · ${Number(x.vaccination_count||0)===0?'No vaccination record uploaded':x.vaccination_status==='rejected'?'Replacement requested':'Record waiting for review'}</p><button class="secondary" onclick="openVaccinationReview(${x.pet_id})">${x.vaccination_status==='not_provided'?'Open / mark as seen':'Review record'}</button></div>`).join('')}${(t.cancellationAttention||[]).map(x=>`<div class="card"><b>Cancellation · ${esc(x.booking_ref)}</b><p>${esc(x.client_name)} · ${esc(x.pet_name||'')}</p><button class="secondary" onclick="openTrainerBooking(${x.id})">Handle refund</button></div>`).join('')}${(t.classRefundAttention||[]).map(x=>`<div class="card"><span>Class cancellation / refund · ${esc(x.title)}</span><p>${esc(x.client_name)} · ${esc(x.pet_name||'')}</p><button class="secondary" onclick="state.selectedClassAdmin=${x.class_id};openTrainerAdmin('classes')">Open class</button></div>`).join('')}${!(t.vaccinationAttention||[]).length&&!(t.cancellationAttention||[]).length&&!(t.classRefundAttention||[]).length?'<p class="small">Nothing needs attention.</p>':''}</div></section>`;
-}
+/* cleanup: overridden attentionAdminView declaration removed */
 async function deleteOneOffBlock(id){try{await api(`/api/trainer/blocks/${id}`,{method:"DELETE"});state.workingHours=await api("/api/trainer/working-hours");state.trainer=await api("/api/trainer/summary");await loadTrainerMonth(parseDateKey(state.trainerMonthDate)||new Date());render()}catch(e){appAlert(e.message)}}
 
 function resourceLibraryView(){
@@ -1648,7 +1432,7 @@ async function cancelBooking(id){if(!await appConfirm('Cancel this booking? A pa
 
 function selectClass(id){state.selectedClass=state.classes.find(c=>c.id===id);state.selectedPet=null;render()}
 function joinPortal(){portal()}
-function accountView(){return `<section class="screen"><div class="center"><div class="panel" style="width:min(620px,100%)"><button class="back" onclick="state.accountOpen=false;go(state.user?.role==='trainer'?'trainer':'portal')">← Back</button><div class="eyebrow">Account & security</div><h2>Change password</h2><p class="small">Your bookings, dogs, vaccination records and training resources are not affected.</p><label>Current password<input id="currentPassword" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="current-password"></label><label style="margin-top:8px">New password<input id="newPassword" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="new-password"></label><label style="margin-top:8px">Confirm new password<input id="confirmPassword" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="new-password"></label><div class="actions"><button class="primary" onclick="changePassword()">Change password</button></div></div></div></section>`}
+/* cleanup: overridden accountView declaration removed */
 async function changePassword(){const a=document.getElementById('currentPassword').value,b=document.getElementById('newPassword').value,c=document.getElementById('confirmPassword').value;if(b!==c)return appAlert('The new passwords do not match.');try{await api('/api/auth/change-password',{method:'POST',body:JSON.stringify({currentPassword:a,newPassword:b})});appAlert('Password changed successfully.');state.accountOpen=false;go(state.user?.role==='trainer'?'trainer':'portal')}catch(e){appAlert(e.message)}}
 
 // ===== v21.8.0 booking, payments, reporting and client communication =====
