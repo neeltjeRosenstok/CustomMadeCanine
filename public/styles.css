@@ -1411,3 +1411,47 @@ input[type="password"]{text-transform:none!important}
 .policy-list-spaced>li>p{
   margin:.25rem 0 .45rem;
 }
+
+
+/* v22.0.0 new public landing page + Amy homepage content editor */
+.new-landing{max-width:1180px;margin:0 auto}
+.landing-amy{display:grid;grid-template-columns:minmax(260px,.78fr) minmax(0,1.22fr);gap:34px;align-items:center;padding:12px 0 26px}
+.landing-amy-photo img{display:block;width:100%;max-height:440px;object-fit:cover;border-radius:18px}
+.landing-amy-copy{max-width:700px}
+.landing-amy-copy h1{margin:.22rem 0 .55rem}
+.landing-read-more{padding:0;margin:.3rem 0 1rem;text-align:left}
+.landing-primary-actions,.landing-bottom-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.landing-primary-actions button{min-width:150px}
+.landing-reviews,.landing-offers{padding:26px 0;border-top:1px solid rgba(37,33,94,.13)}
+.landing-section-head{max-width:720px;margin-bottom:16px}
+.landing-section-head h2{margin:.2rem 0 .4rem}
+.landing-review-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.landing-review-grid .home-review{height:100%;margin:0}
+.home-offer-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.home-offer-card{border:1px solid rgba(37,33,94,.15);border-radius:14px;padding:16px;background:rgba(255,255,255,.35);display:flex;flex-direction:column;align-items:flex-start;min-height:205px}
+.home-offer-card.featured{border-width:2px}
+.home-offer-card h3{margin:.45rem 0}
+.home-offer-card p{margin:.25rem 0 .8rem;flex:1}
+.home-offer-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em}
+.home-offer-meta b,.home-offer-meta i{font-size:.72rem;text-transform:none;letter-spacing:0}
+.home-offer-details{display:flex;justify-content:space-between;gap:12px;width:100%;margin:.25rem 0 .8rem}
+.homepage-admin-list{display:grid;gap:10px}
+.homepage-admin-row{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;border:1px solid rgba(37,33,94,.14);border-radius:12px;padding:14px}
+.homepage-admin-row.inactive{opacity:.62}
+.homepage-admin-row h3,.homepage-admin-row p{margin:.2rem 0}
+.homepage-edit-modal{width:min(720px,94vw)}
+.homepage-editor-checks{display:flex;gap:20px;flex-wrap:wrap;margin:12px 0}
+@media(max-width:900px){
+ .landing-amy{grid-template-columns:1fr;gap:18px}
+ .landing-amy-photo{max-width:620px}
+ .landing-review-grid,.home-offer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:620px){
+ .new-landing{padding-left:14px;padding-right:14px}
+ .landing-amy{padding-top:4px}
+ .landing-review-grid,.home-offer-grid{grid-template-columns:1fr}
+ .landing-primary-actions,.landing-bottom-actions{display:grid;grid-template-columns:1fr}
+ .landing-primary-actions button,.landing-bottom-actions button{width:100%}
+ .homepage-admin-row{grid-template-columns:1fr}
+ .homepage-admin-row .actions{justify-content:flex-start}
+}

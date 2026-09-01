@@ -1,5 +1,5 @@
 const app=document.getElementById("app");
-const state={user:null,menu:false,view:"home",classes:[],reviews:[],config:null,selectedService:null,selectedLocation:null,selectedDate:null,address:"",slots:[],selectedSlot:null,selectedClass:null,selectedPet:null,showAddPet:false,trainerCalendar:null,trainerWeekStart:null,trainerSelectedDate:null,scheduleModal:null,resourceUploadOpen:false,accountOpen:false,pendingBlock:null,authEmailRemembered:"",vaccinationReview:null,trainerMonthDate:null,trainerMonthCalendar:null,serviceAvailability:null,serviceAvailabilityModal:null,trainerClientBooking:null,trainerClientBookingSlots:[],trainerAdminPage:null,workingHours:null,reviewAdmin:null,clientAdmin:null,selectedReviewAdmin:null,rescheduleDraft:null,classAdmin:null,selectedClassAdmin:null,editPet:null,workingExceptionModal:null,activityAdmin:null,selectedDayStatus:null,trainerDayMeta:null,locationPlanModal:null,recurringBlockModal:null,addPetBookingContext:null,schedulingDate:null,scheduleBlocks:[],bookingTermsOpen:false,reports:null,reportType:"daily",reportFrom:"",reportTo:"",archivedClientsOpen:false,appDialog:null};
+const state={user:null,menu:false,view:"home",classes:[],reviews:[],homepageItems:[],homepageAdmin:[],homepageEdit:null,config:null,selectedService:null,selectedLocation:null,selectedDate:null,address:"",slots:[],selectedSlot:null,selectedClass:null,selectedPet:null,showAddPet:false,trainerCalendar:null,trainerWeekStart:null,trainerSelectedDate:null,scheduleModal:null,resourceUploadOpen:false,accountOpen:false,pendingBlock:null,authEmailRemembered:"",vaccinationReview:null,trainerMonthDate:null,trainerMonthCalendar:null,serviceAvailability:null,serviceAvailabilityModal:null,trainerClientBooking:null,trainerClientBookingSlots:[],trainerAdminPage:null,workingHours:null,reviewAdmin:null,clientAdmin:null,selectedReviewAdmin:null,rescheduleDraft:null,classAdmin:null,selectedClassAdmin:null,editPet:null,workingExceptionModal:null,activityAdmin:null,selectedDayStatus:null,trainerDayMeta:null,locationPlanModal:null,recurringBlockModal:null,addPetBookingContext:null,schedulingDate:null,scheduleBlocks:[],bookingTermsOpen:false,reports:null,reportType:"daily",reportFrom:"",reportTo:"",archivedClientsOpen:false,appDialog:null};
 
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 const money=n=>`KES ${Number(n||0).toLocaleString()}`;
@@ -77,10 +77,11 @@ async function init(){
         state.trainingNotes=await api("/api/my/training-notes");
       }catch(e){ state.startupError=e.message||"Could not load your client portal."; }
     } else state.view="home";
-    const results=await Promise.allSettled([api("/api/classes"),api("/api/reviews"),api("/api/config")]);
-    const [classes,reviews,config]=results;
+    const results=await Promise.allSettled([api("/api/classes"),api("/api/reviews"),api("/api/homepage-items"),api("/api/config")]);
+    const [classes,reviews,homepageItems,config]=results;
     if(classes.status==="fulfilled"&&Array.isArray(classes.value)) state.classes=classes.value;
     if(reviews.status==="fulfilled"&&Array.isArray(reviews.value)) state.reviews=reviews.value;
+    if(homepageItems.status==="fulfilled"&&Array.isArray(homepageItems.value)) state.homepageItems=homepageItems.value;
     if(config.status==="fulfilled") state.config=config.value||{};
     if(!state.startupError){const failed=results.find(x=>x.status==="rejected");if(failed)state.startupError=failed.reason?.message||"One part of the app could not be loaded.";}
   }catch(e){state.user=null;state.view="home";state.startupError=e.message||"Could not start the application.";}
@@ -95,7 +96,7 @@ function shell(content){
     <main onclick="if(state.menu){state.menu=false;render()}">${state.config?.onlineTest?`<div class="online-test-banner" role="status"><span>TEST VERSION</span><span>Demo payments only · Please do not upload real vaccination or other sensitive documents.</span></div>`:""}${state.startupError?`<div class="startup-warning" role="status"><b>Some information could not be loaded.</b><span>${esc(state.startupError)}</span><button class="secondary compact-button" onclick="init()">Retry</button></div>`:''}${content}</main>
     ${appDialogView()}
     ${state.menu?`<nav class="menu" aria-label="Main menu">
-      <button onclick="go('about')">More about Amy</button>
+      <button onclick="go('about')">Meet Amy</button>
       <button onclick="portal()">Client Portal</button>
       <button onclick="contactAmy()">Contact Amy</button>
       ${state.user?.role==="trainer"?`<button onclick="go('trainer')">Trainer Dashboard</button>`:""}
@@ -105,23 +106,50 @@ function shell(content){
 }
 function toggleMenu(){state.menu=!state.menu;render()}
 function go(v){state.view=v;state.menu=false;render();if(v==='payment'){requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'auto'}));}}
+function homepageAction(item){
+ const type=String(item?.action_type||"signup");
+ if(type==="whatsapp")return "contactAmy()";
+ if(type==="classes")return "go('classes')";
+ if(type==="none")return "";
+ return "startHomepageSignup()";
+}
+function startHomepageSignup(){
+ state.authMode="register";state.authMessage="";state.authReturnToBooking=false;go("auth");
+}
+function homepageOfferCard(item){
+ const action=homepageAction(item);
+ const label=item.action_label||({whatsapp:"WhatsApp Amy",classes:"See classes",none:"",signup:"Sign up"}[item.action_type]||"Sign up");
+ return `<article class="home-offer-card ${item.featured?"featured":""}"><div class="home-offer-meta"><span>${esc(String(item.item_type||"Offer").replace(/^./,x=>x.toUpperCase()))}</span>${item.featured?`<b>Featured</b>`:""}</div><h3>${esc(item.title)}</h3>${item.description?`<p>${esc(item.description)}</p>`:""}${item.date_text||item.price_text?`<div class="home-offer-details">${item.date_text?`<span>${esc(item.date_text)}</span>`:""}${item.price_text?`<strong>${esc(item.price_text)}</strong>`:""}</div>`:""}${action&&label?`<button class="secondary compact-button" onclick="${action}">${esc(label)}</button>`:""}</article>`;
+}
 function home(){
- const reviews=state.reviews||[];
- return `<section class="screen home-screen"><div class="home-layout">
-  <div class="home-intro">
-    <div class="eyebrow">Dog training · Nairobi</div>
-    <h1 class="home-main-title">Set your dog up<br>for life!</h1>
-    <p class="lead">Work with Amy through one-on-one training or an upcoming course. Simple booking, clear guidance and a private place for your training resources.</p>
-    <div class="home-actions">
-      <button class="primary home-action" onclick="startPrivate()"><strong>Private Training</strong><span>One-on-One training at home or at Amy's arena</span></button>
-      <button class="secondary home-action" onclick="go('classes')"><strong>Take part in Class</strong><span>Reserve your spot in the upcoming course</span></button>
+ const reviews=state.reviews||[],offers=state.homepageItems||[];
+ return `<section class="screen home-screen new-landing">
+  <section class="landing-amy" aria-labelledby="whoIsAmy">
+    <div class="landing-amy-photo"><img src="/amy-ollie.jpg" alt="Amy with a dog"></div>
+    <div class="landing-amy-copy">
+      <div class="eyebrow">Meet Amy</div>
+      <h1 id="whoIsAmy">Who is Amy?</h1>
+      <p class="lead">Amy is a qualified companion dog trainer who has been helping dogs and their people in Kenya since 2006. Her approach is practical, humane and focused on teaching owners how to communicate clearly with their dogs.</p>
+      <button class="text-button landing-read-more" onclick="go('about')">Read more about Amy →</button>
+      <div class="landing-primary-actions">
+        <button class="secondary" onclick="contactAmy()">WhatsApp Amy</button>
+        <button class="primary" onclick="startHomepageSignup()">Sign up</button>
+      </div>
     </div>
-  </div>
-  <aside class="home-reviews" aria-label="Client reviews">
-    <div class="home-reviews-head"><div><div class="eyebrow">Client stories</div><h2>What clients say</h2></div></div>
-    <div class="home-review-list">${reviews.length?reviews.map(r=>`<article class="home-review">${r.photo_url?`<img class="review-photo" src="${r.photo_url}" alt="Photo shared with ${esc(r.name)}’s review">`:""}<div><div class="stars">${"★".repeat(r.rating)}${"☆".repeat(5-r.rating)}</div><b>${esc(r.name)}</b><p>${esc(r.text)}</p></div></article>`).join(""):`<div class="review-empty">Client reviews appear here.</div>`}</div>
-  </aside>
- </div>${floatingWhatsapp()}</section>`;
+  </section>
+
+  <section class="landing-reviews" aria-labelledby="landingReviewsTitle">
+    <div class="landing-section-head"><div class="eyebrow">Client stories</div><h2 id="landingReviewsTitle">What clients say</h2></div>
+    <div class="landing-review-grid">${reviews.length?reviews.map(r=>`<article class="home-review">${r.photo_url?`<img class="review-photo" src="${r.photo_url}" alt="Photo shared with ${esc(r.name)}’s review">`:""}<div><div class="stars">${"★".repeat(r.rating)}${"☆".repeat(5-r.rating)}</div><b>${esc(r.name)}</b><p>${esc(r.text)}</p></div></article>`).join(""):`<div class="review-empty">Client reviews appear here.</div>`}</div>
+  </section>
+
+  <section class="landing-offers" aria-labelledby="offersTitle">
+    <div class="landing-section-head"><div class="eyebrow">Training, classes & events</div><h2 id="offersTitle">What Amy Offers</h2><p>See what is coming up, or get in touch if you are not sure where to start.</p></div>
+    <div class="home-offer-grid">${offers.length?offers.map(homepageOfferCard).join(""):`<article class="home-offer-card"><div class="home-offer-meta"><span>Private training</span></div><h3>One-on-One training</h3><p>Training tailored to you and your dog, with Amy.</p><button class="secondary compact-button" onclick="startHomepageSignup()">Sign up</button></article><article class="home-offer-card"><div class="home-offer-meta"><span>Classes</span></div><h3>Upcoming group classes</h3><p>New classes and events will appear here when Amy publishes them.</p><button class="secondary compact-button" onclick="go('classes')">See classes</button></article>`}</div>
+    <div class="landing-bottom-actions"><button class="secondary" onclick="contactAmy()">WhatsApp Amy</button><button class="primary" onclick="startHomepageSignup()">Sign up</button></div>
+  </section>
+  ${floatingWhatsapp()}
+ </section>`;
 }
 
 function about(){
@@ -776,6 +804,7 @@ function trainerView(){
     <button class="task-button task-hours" onclick="openScheduling()"><span>Scheduling</span><span>→</span></button>
     <button class="task-button task-clients" onclick="openTrainerAdmin('clients')"><span>Clients</span><b>${clientCount||'→'}</b></button>
     <button class="task-button task-history" onclick="openTrainerAdmin('activity')"><span>Activity history</span><span>→</span></button>
+    <button class="task-button task-homepage" onclick="openTrainerAdmin('homepage')"><span>Homepage content</span><span>→</span></button>
   </div>
 
   <div class="trainer-dashboard-grid">
@@ -1758,9 +1787,37 @@ function exportReportCsv(){
  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),x=document.createElement('a');x.href=URL.createObjectURL(blob);x.download=`cmc-${state.reportType}-${state.reportFrom||'report'}.csv`;x.click();setTimeout(()=>URL.revokeObjectURL(x.href),1000);
 }
 
-function trainerAdminView(){if(state.trainerAdminPage==='reports')return reportsAdminView();if(state.trainerAdminPage==='attention')return attentionAdminView();if(state.trainerAdminPage==='activity')return activityAdminView();if(state.trainerAdminPage==='clients')return clientAdminView();if(state.trainerAdminPage==='classes')return classesAdminView();if(state.trainerAdminPage==='reviews')return reviewAdminView();if(state.trainerAdminPage==='scheduling')return workingHoursView();return `<section class="screen admin-screen"><button class="back-dashboard" onclick="dashboardBack()">← Back to Dashboard</button><p>Choose a dashboard tool.</p></section>`}
 
-async function openTrainerAdmin(page){state.trainerAdminPage=page;state.view='trainerAdmin';if(page==='clients')state.clientAdmin=await api('/api/trainer/clients');else if(page==='activity')state.activityAdmin=await api('/api/trainer/activity');else if(page==='classes'){state.classAdmin=await api('/api/trainer/classes-detail');state.selectedClassAdmin=state.classAdmin[0]?.id||null}else if(page==='reviews')state.reviewAdmin=await api('/api/trainer/reviews');else if(page==='scheduling'){state.workingHours=await api('/api/trainer/working-hours');state.scheduleBlocks=await api('/api/trainer/schedule-blocks')}else if(page==='attention')state.trainer=await api('/api/trainer/summary');else if(page==='reports'){state.reports=null;state.reportFrom=nairobiDateKeyClient(0);state.reportTo=nairobiDateKeyClient(0)}render()}
+function homepageContentAdminView(){
+ const rows=state.homepageAdmin||[],edit=state.homepageEdit;
+ return `<section class="screen admin-screen homepage-admin-screen"><button class="back-dashboard" onclick="dashboardBack()">← Back to Dashboard</button><div class="admin-head"><div><div class="eyebrow">Amy's workspace</div><h2>Homepage Content</h2><p>Control the cards shown under <b>What Amy Offers</b> on the public landing page.</p></div><button class="primary" onclick="newHomepageItem()">＋ Add item</button></div>
+ <div class="homepage-admin-list">${rows.length?rows.map(x=>`<article class="homepage-admin-row ${x.active?"":"inactive"}"><div><div class="home-offer-meta"><span>${esc(x.item_type)}</span>${x.featured?`<b>Featured</b>`:""}${!x.active?`<i>Hidden</i>`:""}</div><h3>${esc(x.title)}</h3><p>${esc(x.description||"")}</p><small>${esc(x.date_text||"")}${x.date_text&&x.price_text?" · ":""}${esc(x.price_text||"")}</small></div><div class="actions"><button class="secondary compact-button" onclick="editHomepageItem(${x.id})">Edit</button><button class="danger compact-button" onclick="deleteHomepageItem(${x.id})">Delete</button></div></article>`).join(""):`<div class="panel"><p>No homepage items yet. The public page will show its simple default cards until you add one.</p></div>`}</div>
+ ${edit?homepageEditModal(edit):""}</section>`;
+}
+function homepageEditModal(x){
+ return `<div class="modal-overlay"><div class="trainer-modal homepage-edit-modal"><button class="close-btn modal-close" onclick="state.homepageEdit=null;render()">×</button><div class="eyebrow">Homepage content</div><h2>${x.id?"Edit item":"Add item"}</h2>
+ <div class="form-grid"><label>Type<select id="hpItemType"><option value="service" ${x.item_type==="service"?"selected":""}>Service</option><option value="class" ${x.item_type==="class"?"selected":""}>Class</option><option value="event" ${x.item_type==="event"?"selected":""}>Event</option><option value="announcement" ${x.item_type==="announcement"?"selected":""}>Announcement</option></select></label><label>Display order<input id="hpSortOrder" type="number" value="${Number(x.sort_order??100)}"></label></div>
+ <label>Title<input id="hpTitle" value="${esc(x.title||"")}" maxlength="90"></label>
+ <label>Short description<textarea id="hpDescription" rows="4">${esc(x.description||"")}</textarea></label>
+ <div class="form-grid"><label>Date / timing text<input id="hpDateText" value="${esc(x.date_text||"")}" placeholder="e.g. Starts 12 October"></label><label>Price text<input id="hpPriceText" value="${esc(x.price_text||"")}" placeholder="e.g. KES 6,000"></label></div>
+ <div class="form-grid"><label>Button<select id="hpActionType"><option value="signup" ${x.action_type==="signup"?"selected":""}>Sign up</option><option value="whatsapp" ${x.action_type==="whatsapp"?"selected":""}>WhatsApp Amy</option><option value="classes" ${x.action_type==="classes"?"selected":""}>See classes</option><option value="none" ${x.action_type==="none"?"selected":""}>No button</option></select></label><label>Custom button wording<input id="hpActionLabel" value="${esc(x.action_label||"")}" placeholder="Optional"></label></div>
+ <div class="homepage-editor-checks"><label class="check-row"><input id="hpFeatured" type="checkbox" ${x.featured?"checked":""}> Featured</label><label class="check-row"><input id="hpActive" type="checkbox" ${x.active!==0?"checked":""}> Show on homepage</label></div>
+ <div class="actions"><button class="secondary" onclick="state.homepageEdit=null;render()">Cancel</button><button class="primary" onclick="saveHomepageItem()">Save</button></div>
+ </div></div>`;
+}
+function newHomepageItem(){state.homepageEdit={item_type:"service",title:"",description:"",date_text:"",price_text:"",action_type:"signup",action_label:"",featured:0,active:1,sort_order:100};render()}
+function editHomepageItem(id){const x=(state.homepageAdmin||[]).find(r=>Number(r.id)===Number(id));if(x){state.homepageEdit={...x};render()}}
+async function saveHomepageItem(){
+ const x=state.homepageEdit;if(!x)return;
+ const body={itemType:document.getElementById("hpItemType").value,title:document.getElementById("hpTitle").value.trim(),description:document.getElementById("hpDescription").value.trim(),dateText:document.getElementById("hpDateText").value.trim(),priceText:document.getElementById("hpPriceText").value.trim(),actionType:document.getElementById("hpActionType").value,actionLabel:document.getElementById("hpActionLabel").value.trim(),featured:document.getElementById("hpFeatured").checked,active:document.getElementById("hpActive").checked,sortOrder:Number(document.getElementById("hpSortOrder").value||100)};
+ if(!body.title)return appAlert("Please add a title.");
+ try{await api(x.id?`/api/trainer/homepage-items/${x.id}`:"/api/trainer/homepage-items",{method:x.id?"PUT":"POST",body:JSON.stringify(body)});state.homepageAdmin=await api("/api/trainer/homepage-items");state.homepageItems=await api("/api/homepage-items");state.homepageEdit=null;render()}catch(e){appAlert(e.message)}
+}
+async function deleteHomepageItem(id){if(!await appConfirm("Delete this homepage item?"))return;try{await api(`/api/trainer/homepage-items/${id}`,{method:"DELETE"});state.homepageAdmin=await api("/api/trainer/homepage-items");state.homepageItems=await api("/api/homepage-items");render()}catch(e){appAlert(e.message)}}
+
+function trainerAdminView(){if(state.trainerAdminPage==='homepage')return homepageContentAdminView();if(state.trainerAdminPage==='reports')return reportsAdminView();if(state.trainerAdminPage==='attention')return attentionAdminView();if(state.trainerAdminPage==='activity')return activityAdminView();if(state.trainerAdminPage==='clients')return clientAdminView();if(state.trainerAdminPage==='classes')return classesAdminView();if(state.trainerAdminPage==='reviews')return reviewAdminView();if(state.trainerAdminPage==='scheduling')return workingHoursView();return `<section class="screen admin-screen"><button class="back-dashboard" onclick="dashboardBack()">← Back to Dashboard</button><p>Choose a dashboard tool.</p></section>`}
+
+async function openTrainerAdmin(page){state.trainerAdminPage=page;state.view='trainerAdmin';if(page==='clients')state.clientAdmin=await api('/api/trainer/clients');else if(page==='activity')state.activityAdmin=await api('/api/trainer/activity');else if(page==='classes'){state.classAdmin=await api('/api/trainer/classes-detail');state.selectedClassAdmin=state.classAdmin[0]?.id||null}else if(page==='reviews')state.reviewAdmin=await api('/api/trainer/reviews');else if(page==='scheduling'){state.workingHours=await api('/api/trainer/working-hours');state.scheduleBlocks=await api('/api/trainer/schedule-blocks')}else if(page==='attention')state.trainer=await api('/api/trainer/summary');else if(page==='reports'){state.reports=null;state.reportFrom=nairobiDateKeyClient(0);state.reportTo=nairobiDateKeyClient(0)}else if(page==='homepage'){state.homepageAdmin=await api('/api/trainer/homepage-items');state.homepageEdit=null}render()}
 function render(){
  if(state.starting){
    app.innerHTML=`<div class="app-shell"><header class="topbar"><div class="brand"><div class="brand-mark">C</div><div class="brand-name">The Custom Made Canine</div></div></header><main><section class="screen"><div class="center"><div class="panel"><div class="eyebrow">Loading</div><h2>Preparing your workspace…</h2><p class="small">Checking your sign-in and loading the correct portal.</p></div></div></section></main></div>`;

@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "21.9.16z6-online-test";
+const APP_VERSION = "22.0.0-landing";
 const STK_PUSH_ENABLED = process.env.STK_PUSH_ENABLED === "true"; // dormant future option; manual PayBill is the live payment flow
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
@@ -491,6 +491,22 @@ try { db.exec("ALTER TABLE recurring_blocks ADD COLUMN end_date TEXT"); } catch 
 try { db.exec("ALTER TABLE reviews ADD COLUMN starred INTEGER NOT NULL DEFAULT 0"); } catch {}
 try { db.exec("ALTER TABLE reviews ADD COLUMN retired INTEGER NOT NULL DEFAULT 0"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN client_status TEXT NOT NULL DEFAULT 'current'"); } catch {}
+db.exec(`CREATE TABLE IF NOT EXISTS homepage_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_type TEXT NOT NULL DEFAULT 'service',
+  title TEXT NOT NULL,
+  description TEXT,
+  date_text TEXT,
+  price_text TEXT,
+  action_label TEXT,
+  action_type TEXT NOT NULL DEFAULT 'signup',
+  featured INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  sort_order INTEGER NOT NULL DEFAULT 100,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);`);
+
 try { db.exec("ALTER TABLE classes ADD COLUMN location_type TEXT NOT NULL DEFAULT 'arena'"); } catch {}
 try { db.exec("ALTER TABLE classes ADD COLUMN location_name TEXT"); } catch {}
 for(let d=0; d<7; d++){
@@ -909,6 +925,59 @@ app.get("/api/reviews/:id/photo",(req,res)=>{
   if(!r||r.status!=='approved'||!r.photo_filename||!r.photo_consent)return res.status(404).end();
   const full=path.join(PRIVATE_UPLOAD_DIR,r.photo_filename); if(!fs.existsSync(full))return res.status(404).end(); res.sendFile(full);
 });
+
+app.get("/api/homepage-items",(req,res)=>{
+  const rows=db.prepare(`SELECT id,item_type,title,description,date_text,price_text,action_label,action_type,featured,sort_order
+    FROM homepage_items WHERE active=1 ORDER BY featured DESC,sort_order ASC,id DESC`).all();
+  res.json(rows);
+});
+app.get("/api/trainer/homepage-items",requireTrainer,(req,res)=>{
+  res.json(db.prepare(`SELECT * FROM homepage_items ORDER BY active DESC,featured DESC,sort_order ASC,id DESC`).all());
+});
+app.post("/api/trainer/homepage-items",requireTrainer,(req,res)=>{
+  const b=req.body||{};
+  const title=String(b.title||"").trim();
+  if(!title)return res.status(400).json({error:"Please add a title."});
+  const actionType=["signup","whatsapp","classes","none"].includes(String(b.actionType||"signup"))?String(b.actionType||"signup"):"signup";
+  const info={
+    itemType:String(b.itemType||"service").trim()||"service",
+    title,
+    description:String(b.description||"").trim(),
+    dateText:String(b.dateText||"").trim(),
+    priceText:String(b.priceText||"").trim(),
+    actionLabel:String(b.actionLabel||"").trim(),
+    actionType,
+    featured:b.featured?1:0,
+    active:b.active===false?0:1,
+    sortOrder:Number.isFinite(Number(b.sortOrder))?Number(b.sortOrder):100
+  };
+  const id=db.prepare(`INSERT INTO homepage_items(item_type,title,description,date_text,price_text,action_label,action_type,featured,active,sort_order)
+    VALUES(@itemType,@title,@description,@dateText,@priceText,@actionLabel,@actionType,@featured,@active,@sortOrder)`).run(info).lastInsertRowid;
+  res.json(db.prepare("SELECT * FROM homepage_items WHERE id=?").get(id));
+});
+app.put("/api/trainer/homepage-items/:id",requireTrainer,(req,res)=>{
+  const existing=db.prepare("SELECT * FROM homepage_items WHERE id=?").get(req.params.id);
+  if(!existing)return res.status(404).json({error:"Homepage item not found."});
+  const b=req.body||{};
+  const title=String(b.title??existing.title).trim();
+  if(!title)return res.status(400).json({error:"Please add a title."});
+  const actionType=["signup","whatsapp","classes","none"].includes(String(b.actionType??existing.action_type))?String(b.actionType??existing.action_type):"signup";
+  const itemType=String((b.itemType??existing.item_type) || "service");
+  const description=String((b.description??existing.description) || "");
+  const dateText=String((b.dateText??existing.date_text) || "");
+  const priceText=String((b.priceText??existing.price_text) || "");
+  const actionLabel=String((b.actionLabel??existing.action_label) || "");
+  db.prepare(`UPDATE homepage_items SET item_type=?,title=?,description=?,date_text=?,price_text=?,action_label=?,action_type=?,featured=?,active=?,sort_order=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+    .run(itemType,title,description,dateText,priceText,actionLabel,actionType,b.featured===undefined?existing.featured:(b.featured?1:0),b.active===undefined?existing.active:(b.active?1:0),Number.isFinite(Number(b.sortOrder))?Number(b.sortOrder):existing.sort_order,req.params.id);
+  res.json(db.prepare("SELECT * FROM homepage_items WHERE id=?").get(req.params.id));
+});
+app.delete("/api/trainer/homepage-items/:id",requireTrainer,(req,res)=>{
+  const row=db.prepare("SELECT id FROM homepage_items WHERE id=?").get(req.params.id);
+  if(!row)return res.status(404).json({error:"Homepage item not found."});
+  db.prepare("DELETE FROM homepage_items WHERE id=?").run(req.params.id);
+  res.json({ok:true});
+});
+
 app.get("/api/config",(req,res)=>res.json({
   appName:process.env.APP_NAME||"The Custom Made Canine",
   whatsapp:process.env.WHATSAPP_NUMBER||"",

@@ -1,10 +1,20 @@
-The Custom Made Canine v21.9.16z6 ONLINE TEST
+The Custom Made Canine v22.0.0 — LANDING PAGE
 
-Focused PayBill instruction numbering fix:
-- Continuous numbering through the manual PayBill branch
-- Final numbered line is:
-  9. Click the Submit payment Confirmation
-- Awaiting-confirmation explanation moved below the numbered list
-- All previous z5 PayBill alignment, T&C, CMK9, supplied QR/logo and 10-character M-Pesa validation remain unchanged
+Public landing page:
+- Who is Amy section first
+- WhatsApp Amy + Sign up immediately below
+- Existing approved reviews next
+- What Amy Offers after reviews
+- Repeat WhatsApp Amy + Sign up at the end
+- Responsive desktop / iPad / phone layout
+
+Amy dashboard:
+- Homepage Content tool
+- Add, edit, feature, hide and delete What Amy Offers cards
+- Service / Class / Event / Announcement types
+- Optional timing, price and action wording
+- Persistent database-backed content
+
+The Sign up button still opens the existing registration screen. The agreed multi-page New Client Application flow is intentionally left for the next build.
 
 No database reset required.
