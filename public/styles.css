@@ -1339,10 +1339,75 @@ input[type="password"]{text-transform:none!important}
 
 
 /* v21.9.16v paybill layout polish */
-.paybill-details .business-stack{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px}
-.paybill-details .business-stack small{margin:0;text-align:left}
+
+
 .paybill-details .paybill-value{font-weight:800}
 .paybill-step-list{padding-left:1.4rem;margin-left:0;text-align:left}
 .paybill-step-list li{text-align:left;padding-left:.15rem;margin:.38rem 0}
 .paybill-instructions,.paybill-instructions summary{text-align:left}
 .mpesa-pin-warning{text-align:left;margin:.45rem 0 1rem}
+
+
+/* v21.9.16z2 PayBill business-name alignment */
+.paybill-details .business-stack{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  gap:2px;
+  width:100%;
+}
+.paybill-details .business-stack strong,
+.paybill-details .business-stack small{
+  display:block;
+  width:100%;
+  margin:0;
+  text-align:center;
+}
+
+
+/* v21.9.16z5 consolidated PayBill + terms polish */
+.paybill-details>div{
+  grid-template-columns:100px minmax(0,1fr);
+}
+.paybill-details>div>strong.paybill-value,
+.paybill-details>div>.business-stack{
+  justify-self:stretch;
+  text-align:center;
+}
+.paybill-details .business-stack{
+  display:grid;
+  justify-items:center;
+  align-items:center;
+  width:100%;
+}
+.paybill-details .business-stack strong,
+.paybill-details .business-stack small{
+  display:block;
+  width:100%;
+  margin:0;
+  text-align:center;
+}
+.paybill-or{
+  margin:.65rem 0;
+  text-align:left;
+  font-weight:700;
+}
+.payment-manual-steps{
+  margin-top:0;
+  margin-bottom:1rem;
+}
+.payment-confirm-steps{
+  margin-top:.35rem;
+}
+.policy-list-spaced>li{
+  margin-bottom:1rem;
+}
+.policy-list-spaced>li>b{
+  display:block;
+  margin-bottom:.35rem;
+}
+.policy-list-spaced>li>p{
+  margin:.25rem 0 .45rem;
+}

@@ -1,7 +1,14 @@
-The Custom Made Canine v21.9.16z4 ONLINE TEST
+The Custom Made Canine v21.9.16z5 ONLINE TEST
 
-Focused PayBill instruction clarification:
-- Steps 2 and 3 are now explicitly optional when the QR code has already been scanned.
-- All z3 changes remain intact.
+Consolidated small UI patch:
+- Reworked the PayBill step-by-step instructions exactly to the latest agreed wording
+- Uses two distinct Step 3 routes: QR autofill OR manual PayBill/Account entry
+- Keeps the amount dynamic
+- Uses the confirmed account name: Amy Lynn Rapp T/A Custom Made Canine Supply
+- Removes full stops at the end of instruction list lines
+- Strengthens centering of The Custom Made Canine / Amy L Rapp in the PayBill value column
+- Updates Booking Terms & Cancellation Policy with the agreed cancellation, 26-hour reschedule, three-reschedule and trainer-created booking wording
+- T&C section headings appear on their own lines
+- CMK9 installed-app short name and all prior QR/logo changes remain intact
 
 No database reset required.

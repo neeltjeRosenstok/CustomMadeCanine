@@ -1,4 +1,4 @@
-v21.9.16z4 QR OPTIONAL STEPS
+v21.9.16z5 CONSOLIDATED SMALL PATCHES
 
 Replace:
 - server.js
@@ -6,6 +6,15 @@ Replace:
 - VERSION.txt
 - GITHUB-UPDATE-INSTRUCTIONS.txt
 - public/app.js
+- public/styles.css
 - public/index.html
 
 Do NOT reset the database.
+
+Focused checks:
+1. PayBill business name / Amy L Rapp centered in same value column as 542542 / 727777
+2. Payment instructions show QR Step 3, OR manual Step 3, dynamic amount and account confirmation name
+3. Bold items are visibly bold
+4. No full stops at the end of instruction list lines
+5. T&C headings Cancellations / Rescheduling / Trainer-created bookings each appear on their own line
+6. T&C includes 36-hour cancellation, 26-hour reschedule, max three approved reschedules and 24-hour trainer-created booking hold
