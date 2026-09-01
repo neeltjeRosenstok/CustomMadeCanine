@@ -1455,3 +1455,49 @@ input[type="password"]{text-transform:none!important}
  .homepage-admin-row{grid-template-columns:1fr}
  .homepage-admin-row .actions{justify-content:flex-start}
 }
+
+
+/* v22.0.1 New Client Application */
+.application-shell{width:min(980px,100%);margin:0 auto}
+.application-progress{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 18px}
+.application-progress span{padding:9px 10px;border:1px solid rgba(37,33,94,.15);border-radius:9px;text-align:center;font-size:.84rem}
+.application-progress span.active{font-weight:700;border-color:#25215e}
+.application-deposit-copy{padding:16px 18px;border:1px solid rgba(37,33,94,.18);border-radius:14px;margin-bottom:18px}
+.application-deposit-copy h3{margin-top:0}
+.application-deposit-copy p,.application-deposit-copy ul{margin:.5rem 0}
+.aligned-form{display:grid;gap:10px}
+.aligned-form .form-row{display:grid;grid-template-columns:minmax(175px,240px) minmax(0,1fr);gap:18px;align-items:center;min-height:48px}
+.aligned-form .form-row>label:first-child{margin:0;text-align:left}
+.aligned-form input,.aligned-form select{min-height:44px;margin:0}
+.aligned-form textarea{margin:0;width:100%}
+.aligned-form .textarea-row{align-items:start}
+.aligned-form .textarea-row>label:first-child{padding-top:10px}
+.paired-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.paired-fields.three{grid-template-columns:repeat(3,1fr)}
+.paired-fields.three label{margin:0;font-size:.86rem}
+.paired-fields.three input{margin-top:4px}
+.checkbox-form-row .check-row{margin:0}
+.application-nav{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:18px}
+.application-nav.three-actions{justify-content:flex-end}
+.application-card-head h2,.application-household h2,.application-confirm h2{margin:.25rem 0 .4rem}
+.application-dog-card,.application-household,.application-confirm{padding:18px;border:1px solid rgba(37,33,94,.15);border-radius:14px}
+.info-link{display:block;margin-top:5px;padding:0;text-align:left}
+.application-save-note{font-size:.85rem;margin:12px 0 0}
+.application-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 18px}
+.application-summary>div{padding:10px 12px;border:1px solid rgba(37,33,94,.12);border-radius:9px}
+.application-summary span,.application-summary strong{display:block}
+.application-status-banner{margin-bottom:14px}
+@media(max-width:800px){
+ .application-progress{grid-template-columns:1fr 1fr}
+ .aligned-form .form-row{grid-template-columns:1fr;gap:5px;align-items:start}
+ .aligned-form .textarea-row>label:first-child{padding-top:0}
+ .paired-fields{grid-template-columns:1fr}
+ .paired-fields.three{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:520px){
+ .application-progress{grid-template-columns:1fr}
+ .paired-fields.three{grid-template-columns:1fr}
+ .application-summary{grid-template-columns:1fr}
+ .application-nav,.application-nav.three-actions{display:grid;grid-template-columns:1fr}
+ .application-nav button{width:100%}
+}

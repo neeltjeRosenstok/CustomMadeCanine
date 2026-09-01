@@ -1,6 +1,6 @@
 {
-  "name": "The Custom Made Canine",
-  "short_name": "CMC",
+  "name": "CMK9",
+  "short_name": "CMK9",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#e3dcc8",
@@ -30,5 +30,7 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
+  ],
+  "id": "/",
+  "scope": "/"
 }

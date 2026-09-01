@@ -1,5 +1,5 @@
 const app=document.getElementById("app");
-const state={user:null,menu:false,view:"home",classes:[],reviews:[],homepageItems:[],homepageAdmin:[],homepageEdit:null,config:null,selectedService:null,selectedLocation:null,selectedDate:null,address:"",slots:[],selectedSlot:null,selectedClass:null,selectedPet:null,showAddPet:false,trainerCalendar:null,trainerWeekStart:null,trainerSelectedDate:null,scheduleModal:null,resourceUploadOpen:false,accountOpen:false,pendingBlock:null,authEmailRemembered:"",vaccinationReview:null,trainerMonthDate:null,trainerMonthCalendar:null,serviceAvailability:null,serviceAvailabilityModal:null,trainerClientBooking:null,trainerClientBookingSlots:[],trainerAdminPage:null,workingHours:null,reviewAdmin:null,clientAdmin:null,selectedReviewAdmin:null,rescheduleDraft:null,classAdmin:null,selectedClassAdmin:null,editPet:null,workingExceptionModal:null,activityAdmin:null,selectedDayStatus:null,trainerDayMeta:null,locationPlanModal:null,recurringBlockModal:null,addPetBookingContext:null,schedulingDate:null,scheduleBlocks:[],bookingTermsOpen:false,reports:null,reportType:"daily",reportFrom:"",reportTo:"",archivedClientsOpen:false,appDialog:null};
+const state={user:null,menu:false,view:"home",classes:[],reviews:[],homepageItems:[],homepageAdmin:[],homepageEdit:null,applicationStep:1,applicationDraft:null,applicationDogPhoto:null,applicationVaccinationFiles:[],config:null,selectedService:null,selectedLocation:null,selectedDate:null,address:"",slots:[],selectedSlot:null,selectedClass:null,selectedPet:null,showAddPet:false,trainerCalendar:null,trainerWeekStart:null,trainerSelectedDate:null,scheduleModal:null,resourceUploadOpen:false,accountOpen:false,pendingBlock:null,authEmailRemembered:"",vaccinationReview:null,trainerMonthDate:null,trainerMonthCalendar:null,serviceAvailability:null,serviceAvailabilityModal:null,trainerClientBooking:null,trainerClientBookingSlots:[],trainerAdminPage:null,workingHours:null,reviewAdmin:null,clientAdmin:null,selectedReviewAdmin:null,rescheduleDraft:null,classAdmin:null,selectedClassAdmin:null,editPet:null,workingExceptionModal:null,activityAdmin:null,selectedDayStatus:null,trainerDayMeta:null,locationPlanModal:null,recurringBlockModal:null,addPetBookingContext:null,schedulingDate:null,scheduleBlocks:[],bookingTermsOpen:false,reports:null,reportType:"daily",reportFrom:"",reportTo:"",archivedClientsOpen:false,appDialog:null};
 
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 const money=n=>`KES ${Number(n||0).toLocaleString()}`;
@@ -114,7 +114,9 @@ function homepageAction(item){
  return "startHomepageSignup()";
 }
 function startHomepageSignup(){
- state.authMode="register";state.authMessage="";state.authReturnToBooking=false;go("auth");
+ state.applicationStep=1;
+ state.applicationDraft=state.applicationDraft||{name:"",email:"",whatsappPhone:"",mpesaPhone:"",newsletterOptIn:false,location:"",introNote:"",dogName:"",dogBreed:"",dogGender:"",dogDob:"",householdDogs:"",householdAdults:"",children0to8:"",children9to13:"",children14plus:"",householdChanges:"",householdNote:"",password:"",confirmPassword:""};
+ go("application");
 }
 function homepageOfferCard(item){
  const action=homepageAction(item);
@@ -163,7 +165,7 @@ function about(){
    <p>Additionally, Amy has worked with the Kenya Police Dog Unit, the East Africa Kennel Club, the Labrador League, and the German Shepherd Dog League. She also collaborates continuously with the KSPCA on behavioural assessments, training dog handlers and preparing rescue dogs for successful adoption.</p>
    <p>Amy’s philosophy focuses on positive, humane methods. Instead of just training the dog, she teaches owners how to communicate clearly with their pets to ensure lasting good behaviour.</p>
   </div>
-  <div class="actions meet-amy-actions"><button class="primary" onclick="startPrivate()">Book private training</button><button class="secondary" onclick="contactAmy()">WhatsApp Amy</button></div>
+  <div class="actions meet-amy-actions"><button class="primary" onclick="startHomepageSignup()">Sign up</button><button class="secondary" onclick="contactAmy()">WhatsApp Amy</button></div>
  </div></div></section>`;
 }
 function bookingBackView(){return state.bookingOrigin==="portal"?"portal":"home"}
@@ -389,7 +391,9 @@ async function portal(){
 function portalView(){
  const p=state.profile,b=state.bookings,r=state.resources,tab=state.portalTab||"dogs";
  const body=tab==="media"?resourceList(r):tab==="bookings"?bookingsHub(b):petsView(p.pets);
+ const applicant=String(state.user?.client_status||"current")!=="current";
  return `<section class="screen client-dashboard"><div class="eyebrow">Client Portal</div><h2>Welcome, ${esc(state.user.name.split(" ")[0])}</h2>
+ ${applicant?`<div class="notice application-status-banner"><b>New Client Application</b><br>Your account is open for profile and dog information. Booking is locked until Amy approves your application.</div>`:""}
  <div class="portal-menu portal-menu-primary"><button class="${tab==="dogs"?"active":""}" onclick="openPortalTab('dogs')"><span>Dogs</span><small>Profiles & vaccination</small></button><button class="${tab==="bookings"?"active":""}" onclick="openPortalTab('bookings')"><span>Bookings</span><small>Bookings & new training</small></button><button class="${tab==="media"?"active":""}" onclick="openPortalTab('media')"><span>Resources</span><small>Training material</small></button></div>
  <div class="panel client-dashboard-main">${body}</div>
  <div class="portal-menu portal-menu-secondary"><button onclick="openPortalTab('review')"><span>Review</span></button><button onclick="openClientAccount()"><span>Account</span></button></div>
@@ -417,7 +421,7 @@ function clientFinancialSummary(b){
 
 function bookingsHub(b){
  const credit=Math.max(0,Number(state.profile?.creditBalance||0));
- return `<div class="bookings-panel"><h3>My bookings</h3>${credit>0?`<div class="client-credit-banner"><span>Credit available</span><strong>${money(credit)}</strong><small>This will be offered when you next pay for training.</small></div>`:""}${clientFinancialSummary(b)}<div class="actions client-booking-actions"><button class="secondary" onclick="startPrivate('portal')">Book private training</button><button class="secondary" onclick="openPortalClasses()">View classes</button></div>${bookingsView(b)}</div>`;
+ return `<div class="bookings-panel"><h3>My bookings</h3>${credit>0?`<div class="client-credit-banner"><span>Credit available</span><strong>${money(credit)}</strong><small>This will be offered when you next pay for training.</small></div>`:""}${clientFinancialSummary(b)}${String(state.user?.client_status||"current")==="current"?`<div class="actions client-booking-actions"><button class="secondary" onclick="startPrivate('portal')">Book private training</button><button class="secondary" onclick="openPortalClasses()">View classes</button></div>`:`<div class="notice"><b>Booking not yet available</b><br>Amy needs to approve your New Client Application before you can book training or classes.</div>`}${bookingsView(b)}</div>`;
 }
 
 function reviewPage(){return `<h3>Leave a review</h3><label>Rating<select id="reviewRating"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></label><label>Review<textarea id="reviewText" rows="4"></textarea></label><label>Photo (optional)<input id="reviewPhoto" type="file" accept="image/jpeg,image/png,image/webp"></label><label class="review-consent"><input id="reviewPhotoConsent" type="checkbox"> I give The Custom Made Canine permission to publish this photo with my review.</label><p class="review-helper">Amy would love to read your review and see your photo. Even if you do not want the photo published, feel free to keep it private, but if you don't mind, she'll love being able to show it off even more.</p><button class="primary" onclick="submitReview()">Submit for approval</button>`}
@@ -1485,6 +1489,70 @@ function classDetails(){const c=state.selectedClass;const dog=state.profile?.pet
 function selectPetForBooking(id){state.selectedPet=Number(id);render()}
 async function joinClass(){if(!state.user)return auth('Your place is selected. Please sign in or create an account to continue to payment.');if(!state.selectedPet)return appAlert('Please select which dog this class is for.');const box=document.getElementById('classTermsAccepted');state.classTermsAccepted=!!box?.checked;if(!state.classTermsAccepted)return appAlert('Please read and agree to the Booking Terms & Cancellation Policy.');const pet=(state.profile?.pets||[]).find(p=>p.id===state.selectedPet);if(!pet||pet.archived)return appAlert('Please select an active dog.');const eligibility=dogClassEligibility(pet,state.selectedClass);if(!eligibility.ok)return appAlert(eligibility.code==='dob'?`Please add ${pet.name}'s date of birth before joining this course.`:`${pet.name} does not meet this course's age range.`);try{const d=await api(`/api/classes/${state.selectedClass.id}/enrol`,{method:'POST',body:JSON.stringify({petId:state.selectedPet,termsAccepted:true})});state.confirm={...d,type:'class',classId:state.selectedClass.id,petId:state.selectedPet};go('payment')}catch(e){appAlert(e.message)}}
 
+
+function applicationDepositCopy(){
+ return `<div class="application-deposit-copy"><h3>You are starting a New Client Application</h3><p>Amy asks that you pay <b>KES 1,000</b> to start a client account as this initial phase takes a lot of her time. Of this <b>KES 1,000</b>, only <b>KES 300</b> will be non-refundable (administration fee).</p><p>The remaining <b>KES 700</b> is held pending Amy’s decision:</p><ul><li>if your application is approved, <b>KES 700</b> is added to your account as a credit which can be spent on her services</li><li>if your application is not approved, <b>KES 700</b> is refunded</li></ul><p>Paying the application deposit does not guarantee approval or a booking.</p></div>`;
+}
+function applicationSaveFields(ids){
+ const d=state.applicationDraft||{};
+ for(const [key,id] of Object.entries(ids)){const el=document.getElementById(id);if(el)d[key]=el.type==="checkbox"?el.checked:el.value}
+ state.applicationDraft=d;
+}
+function applicationGo(step){state.applicationStep=Math.max(1,Math.min(4,Number(step)||1));render()}
+function applicationBack(){if(state.applicationStep<=1)return go("home");applicationGo(state.applicationStep-1)}
+function applicationStepOneContinue(){
+ applicationSaveFields({name:"appName",email:"appEmail",whatsappPhone:"appWhatsapp",mpesaPhone:"appMpesa",newsletterOptIn:"appNewsletter",location:"appLocation",introNote:"appIntro"});
+ const d=state.applicationDraft;
+ if(!d.name.trim()||!d.email.trim()||!d.whatsappPhone.trim()||!d.location.trim())return appAlert("Please complete your name, email, WhatsApp number and location.");
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email.trim()))return appAlert("Please enter a valid email address.");
+ applicationGo(2);
+}
+function applicationDogContinue(){
+ applicationSaveFields({dogName:"appDogName",dogBreed:"appDogBreed",dogGender:"appDogGender",dogDob:"appDogDob"});
+ if(!state.applicationDraft.dogName.trim())return appAlert("Please add your dog's name.");
+ applicationGo(3);
+}
+function applicationHouseholdContinue(){
+ applicationSaveFields({householdDogs:"appHouseDogs",householdAdults:"appHouseAdults",children0to8:"appChild08",children9to13:"appChild913",children14plus:"appChild14",householdChanges:"appHouseChanges",householdNote:"appHouseNote"});
+ applicationGo(4);
+}
+function applicationSkipHousehold(){applicationGo(4)}
+function applicationFileChosen(kind,input){
+ if(kind==="photo")state.applicationDogPhoto=input.files?.[0]||null;
+ else state.applicationVaccinationFiles=Array.from(input.files||[]);
+ render();
+}
+function vaccinationRequirements(){
+ return `<div class="modal-overlay"><div class="trainer-modal"><button class="close-btn modal-close" onclick="state.vaccinationInfoOpen=false;render()">×</button><div class="eyebrow">Dog profile</div><h2>Vaccination record requirements</h2><p>Please upload clear photographs of the relevant vaccination record or passport pages. Amy needs to be able to read the dog's details, vaccine information and dates.</p><p>You can add or replace vaccination information later from the dog's profile.</p><div class="actions"><button class="primary" onclick="state.vaccinationInfoOpen=false;render()">Close</button></div></div></div>`;
+}
+async function submitNewClientApplication(){
+ applicationSaveFields({password:"appPassword",confirmPassword:"appConfirmPassword"});
+ const d=state.applicationDraft||{};
+ if(d.password!==d.confirmPassword)return appAlert("The passwords do not match.");
+ if(!(String(d.password||"").length>=8&&/[A-Za-z]/.test(d.password)&&/\d/.test(d.password)))return appAlert("Please use 8 characters, including at least one letter and one number. Symbols and spaces are permitted.");
+ const btn=document.getElementById("applicationCreateBtn");if(btn){btn.disabled=true;btn.textContent="Creating account…"}
+ try{
+  const body={name:d.name,email:d.email,whatsappPhone:d.whatsappPhone,mpesaPhone:d.mpesaPhone,password:d.password,newsletterOptIn:!!d.newsletterOptIn,applicationSignup:true,location:d.location,introNote:d.introNote,householdDogs:d.householdDogs,householdAdults:d.householdAdults,children0to8:d.children0to8,children9to13:d.children9to13,children14plus:d.children14plus,householdChanges:d.householdChanges,householdNote:d.householdNote};
+  const result=await api("/api/auth/register",{method:"POST",body:JSON.stringify(body)});
+  state.user=result.user;
+  const fd=new FormData();fd.append("name",d.dogName);fd.append("species","Dog");fd.append("breed",d.dogBreed||"");if(d.dogGender)fd.append("gender",d.dogGender);if(d.dogDob)fd.append("dateOfBirth",d.dogDob);fd.append("createToken","application-"+Date.now());if(state.applicationDogPhoto)fd.append("dogPhoto",state.applicationDogPhoto);for(const f of state.applicationVaccinationFiles||[])fd.append("vaccinationPages",f);
+  const petRes=await fetch("/api/my/pets",{method:"POST",body:fd});if(!petRes.ok){const x=await petRes.json().catch(()=>({}));throw new Error(x.error||"Your account was created, but the dog details could not be saved. Please add them from your profile.");}
+  state.profile=await api("/api/my/profile");state.bookings=await api("/api/my/bookings");state.resources=await api("/api/my/resources");state.trainingNotes=await api("/api/my/training-notes");
+  state.applicationDraft=null;state.applicationDogPhoto=null;state.applicationVaccinationFiles=[];state.view="portal";state.portalTab="dogs";render();
+  await appAlert("Your client account has been created. You can continue adding information and dogs while your application is being reviewed. Booking remains locked until Amy approves your application.");
+ }catch(e){appAlert(e.message);if(btn){btn.disabled=false;btn.textContent="Create my client account"}}
+}
+function applicationView(){
+ const d=state.applicationDraft||{},step=state.applicationStep||1;
+ const progress=`<div class="application-progress" aria-label="Application progress"><span class="${step>=1?"active":""}">1 Your details</span><span class="${step>=2?"active":""}">2 Dog details</span><span class="${step>=3?"active":""}">3 Household</span><span class="${step>=4?"active":""}">4 Confirm</span></div>`;
+ let body="";
+ if(step===1)body=`${applicationDepositCopy()}<div class="application-form aligned-form"><div class="form-row"><label for="appName">Name</label><input id="appName" value="${esc(d.name||"")}" autocomplete="name"></div><div class="form-row"><label for="appEmail">Email</label><input id="appEmail" type="email" value="${esc(d.email||"")}" autocomplete="email"></div><div class="form-row"><label>Phone numbers</label><div class="paired-fields"><input id="appWhatsapp" value="${esc(d.whatsappPhone||"")}" placeholder="WhatsApp Number" autocomplete="tel"><input id="appMpesa" value="${esc(d.mpesaPhone||"")}" placeholder="M-Pesa number (if different)" autocomplete="tel"></div></div><div class="form-row"><label for="appLocation">Location</label><input id="appLocation" value="${esc(d.location||"")}" placeholder="Area / neighbourhood"></div><div class="form-row checkbox-form-row"><label for="appNewsletter">Newsletter</label><label class="check-row"><input id="appNewsletter" type="checkbox" ${d.newsletterOptIn?"checked":""}> Yes, keep me updated</label></div><div class="form-row textarea-row"><label for="appIntro">Note for Amy</label><div><textarea id="appIntro" rows="4" placeholder="Please introduce yourself, and briefly describe your training needs ie potty training, basic obedience, advanced training">${esc(d.introNote||"")}</textarea><small>Please introduce yourself and briefly describe your training needs</small></div></div></div><p class="application-save-note">By continuing, your contact details may be saved so Amy can assist with your application if needed.</p><div class="application-nav"><button class="secondary" onclick="go('home')">Back</button><button class="primary" onclick="applicationStepOneContinue()">Continue to dog details</button></div>`;
+ if(step===2)body=`<div class="application-dog-card"><div class="application-card-head"><div><div class="eyebrow">Dog details</div><h2>Your dog</h2><p>You will be able to add more dogs to your profile later.</p></div></div><div class="application-form aligned-form"><div class="form-row"><label for="appDogName">Dog name</label><input id="appDogName" value="${esc(d.dogName||"")}"></div><div class="form-row"><label for="appDogBreed">Breed</label><input id="appDogBreed" value="${esc(d.dogBreed||"")}"></div><div class="form-row"><label for="appDogGender">Sex</label><select id="appDogGender"><option value="">Choose</option><option value="male" ${d.dogGender==="male"?"selected":""}>Male</option><option value="female" ${d.dogGender==="female"?"selected":""}>Female</option></select></div><div class="form-row"><label for="appDogDob">Date of birth</label><input id="appDogDob" type="date" value="${esc(d.dogDob||"")}"></div><div class="form-row"><label for="appDogPhoto">Dog photo</label><div><input id="appDogPhoto" type="file" accept="image/jpeg,image/png,image/webp" onchange="applicationFileChosen('photo',this)"><small>${state.applicationDogPhoto?esc(state.applicationDogPhoto.name):"Optional"}</small></div></div><div class="form-row"><label for="appVaccination">Vaccination record</label><div><input id="appVaccination" type="file" accept="image/jpeg,image/png,image/webp" multiple onchange="applicationFileChosen('vaccination',this)"><button type="button" class="text-button info-link" onclick="state.vaccinationInfoOpen=true;render()">ⓘ Vaccination record requirements</button>${(state.applicationVaccinationFiles||[]).length?`<small>${state.applicationVaccinationFiles.length} file(s) selected</small>`:""}</div></div></div></div><div class="application-nav"><button class="secondary" onclick="applicationBack()">Back</button><button class="primary" onclick="applicationDogContinue()">Finish dog details</button></div>`;
+ if(step===3)body=`<div class="application-household"><div class="eyebrow">Optional</div><h2>Household details</h2><p>These questions are optional. You can skip this section if you prefer.</p><div class="application-form aligned-form"><div class="form-row"><label for="appHouseDogs">Number of dogs in household</label><input id="appHouseDogs" type="number" min="0" value="${esc(d.householdDogs||"")}"></div><div class="form-row"><label for="appHouseAdults">Number of adults in household</label><input id="appHouseAdults" type="number" min="0" value="${esc(d.householdAdults||"")}"></div><div class="form-row household-children"><label>Children</label><div class="paired-fields three"><label>0–8<input id="appChild08" type="number" min="0" value="${esc(d.children0to8||"")}"></label><label>9–13<input id="appChild913" type="number" min="0" value="${esc(d.children9to13||"")}"></label><label>14+<input id="appChild14" type="number" min="0" value="${esc(d.children14plus||"")}"></label></div></div><div class="form-row textarea-row"><label for="appHouseChanges">Any major changes to household recently or planned?</label><textarea id="appHouseChanges" rows="3">${esc(d.householdChanges||"")}</textarea></div><div class="form-row textarea-row"><label for="appHouseNote">Additional note for Amy</label><textarea id="appHouseNote" rows="3">${esc(d.householdNote||"")}</textarea></div></div></div><div class="application-nav three-actions"><button class="secondary" onclick="applicationBack()">Back</button><button class="secondary" onclick="applicationSkipHousehold()">Skip this section</button><button class="primary" onclick="applicationHouseholdContinue()">Continue</button></div>`;
+ if(step===4)body=`<div class="application-confirm"><div class="eyebrow">Confirm & secure account</div><h2>Set your password</h2><div class="application-summary"><div><span>Name</span><strong>${esc(d.name||"")}</strong></div><div><span>Email</span><strong>${esc(d.email||"")}</strong></div></div><div class="application-form aligned-form"><div class="form-row"><label for="appPassword">Password</label><input id="appPassword" type="${state.authShowPassword?"text":"password"}" autocomplete="new-password"></div><div class="form-row"><label for="appConfirmPassword">Confirm password</label><input id="appConfirmPassword" type="${state.authShowPassword?"text":"password"}" autocomplete="new-password"></div><div class="form-row checkbox-form-row"><label>Show password</label><label class="check-row"><input type="checkbox" ${state.authShowPassword?"checked":""} onchange="state.authShowPassword=this.checked;render()"> Show password</label></div></div><p class="password-rule"><b>Please use 8 characters, including at least one letter and one number. Symbols and spaces are permitted.</b></p>${applicationDepositCopy()}<div class="notice"><b>Next:</b> your KES 1,000 application deposit and Amy's review. Your account can be used to add more dog/profile information, but booking will remain locked until Amy approves you.</div></div><div class="application-nav"><button class="secondary" onclick="applicationBack()">Back</button><button id="applicationCreateBtn" class="primary" onclick="submitNewClientApplication()">Create my client account</button></div>`;
+ return `<section class="screen application-screen"><button class="back" onclick="applicationBack()">← ${step===1?"Home":"Back"}</button><div class="center"><div class="application-shell">${progress}${body}</div></div>${state.vaccinationInfoOpen?vaccinationRequirements():""}</section>`;
+}
+
 function authView(){
  const hasBooking=!!(state.selectedService||state.selectedClass),register=state.authMode==='register',draft=state.authDraft||{};
  return `<section class="screen"><button class="back" onclick="go(state.selectedService?'private':'classes')">← Back to booking</button><div class="center"><div class="panel auth-panel">
@@ -1828,6 +1896,7 @@ function render(){
  else if(state.view==="about")content=about();
  else if(state.view==="classes")content=classes();
  else if(state.view==="private")content=privateView();
+ else if(state.view==="application")content=applicationView();
  else if(state.view==="auth")content=state.authMode==="forgot"?forgotPasswordView():state.authMode==="reset"?resetPasswordView():authView();
  else if(state.view==="payment")content=paymentView();
  else if(state.view==="confirmation")content=confirmationView();

@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "22.0.0-landing";
+const APP_VERSION = "22.0.1-client-application";
 const STK_PUSH_ENABLED = process.env.STK_PUSH_ENABLED === "true"; // dormant future option; manual PayBill is the live payment flow
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
@@ -491,6 +491,15 @@ try { db.exec("ALTER TABLE recurring_blocks ADD COLUMN end_date TEXT"); } catch 
 try { db.exec("ALTER TABLE reviews ADD COLUMN starred INTEGER NOT NULL DEFAULT 0"); } catch {}
 try { db.exec("ALTER TABLE reviews ADD COLUMN retired INTEGER NOT NULL DEFAULT 0"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN client_status TEXT NOT NULL DEFAULT 'current'"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN location TEXT"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN client_intro_note TEXT"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN household_dogs INTEGER"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN household_adults INTEGER"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN children_0_8 INTEGER"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN children_9_13 INTEGER"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN children_14_plus INTEGER"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN household_changes TEXT"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN household_note TEXT"); } catch {}
 db.exec(`CREATE TABLE IF NOT EXISTS homepage_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   item_type TEXT NOT NULL DEFAULT 'service',
@@ -685,7 +694,7 @@ app.use(express.static(path.join(__dirname,"public")));
 
 function currentUser(req) {
   if (!req.session?.userId || req.session.appVersion !== APP_VERSION) return null;
-  return db.prepare("SELECT id,role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,last_login_at FROM users WHERE id=?").get(req.session.userId) || null;
+  return db.prepare("SELECT id,role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,last_login_at,COALESCE(client_status,\'current\') client_status FROM users WHERE id=?").get(req.session.userId) || null;
 }
 function requireAuth(req,res,next) {
   const u=currentUser(req);
@@ -696,6 +705,11 @@ function requireTrainer(req,res,next) {
   const u=currentUser(req);
   if (!u || u.role!=="trainer") return res.status(403).json({error:"Trainer access required."});
   req.user=u; next();
+}
+function requireApprovedClient(req,res,next) {
+  if(!req.user || req.user.role!=="client")return res.status(403).json({error:"Client access required."});
+  if(String(req.user.client_status||"current")!=="current")return res.status(403).json({error:"Your client application must be approved by Amy before you can make bookings.",code:"APPLICATION_APPROVAL_REQUIRED"});
+  next();
 }
 function ref(prefix="CMC") {
   return `${prefix}-${new Date().toISOString().slice(0,10).replaceAll("-","")}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
@@ -822,7 +836,7 @@ async function initiateMpesa(phone,amount,accountRef) {
 
 // Auth
 app.post("/api/auth/register", (req,res)=>{
- const {name,email,whatsappPhone,mpesaPhone,password,newsletterOptIn}=req.body;
+ const {name,email,whatsappPhone,mpesaPhone,password,newsletterOptIn,applicationSignup,location,introNote,householdDogs,householdAdults,children0to8,children9to13,children14plus,householdChanges,householdNote}=req.body;
  const whats=String(whatsappPhone||"").trim(),mpesa=String(mpesaPhone||"").trim()||whats,cleanEmail=String(email||"").trim().toLowerCase();
  if(!name||!cleanEmail||!whats||!password)return res.status(400).json({error:"Please complete name, WhatsApp number, email and password."});
  if(!validClientEmail(cleanEmail))return res.status(400).json({error:"Please enter a valid email address."});
@@ -831,7 +845,9 @@ app.post("/api/auth/register", (req,res)=>{
  let id=null;
  try{
   const hash=bcrypt.hashSync(password,12);
-  id=db.prepare("INSERT INTO users(role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,last_login_at,password_hash) VALUES('client',?,?,?,?,?,?,CURRENT_TIMESTAMP,?)").run(String(name).trim(),cleanEmail,whats,whats,mpesa,newsletterOptIn?1:0,hash).lastInsertRowid;
+  id=db.prepare(`INSERT INTO users(role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,last_login_at,password_hash,client_status,location,client_intro_note,household_dogs,household_adults,children_0_8,children_9_13,children_14_plus,household_changes,household_note)
+   VALUES('client',?,?,?,?,?,?,CURRENT_TIMESTAMP,?,?,?,?,?,?,?,?,?,?,?,?)`)
+   .run(String(name).trim(),cleanEmail,whats,whats,mpesa,newsletterOptIn?1:0,hash,applicationSignup?"applicant":"current",String(location||"").trim(),String(introNote||"").trim(),householdDogs===""||householdDogs==null?null:Number(householdDogs),householdAdults===""||householdAdults==null?null:Number(householdAdults),children0to8===""||children0to8==null?null:Number(children0to8),children9to13===""||children9to13==null?null:Number(children9to13),children14plus===""||children14plus==null?null:Number(children14plus),String(householdChanges||"").trim(),String(householdNote||"").trim()).lastInsertRowid;
  }catch(e){
   const nowExists=db.prepare("SELECT id FROM users WHERE email=?").get(cleanEmail);
   if(nowExists)return res.status(409).json({error:"An account with this email has just been created. Please try signing in.",code:"EMAIL_JUST_CREATED"});
@@ -1119,7 +1135,7 @@ app.get("/api/trainer/availability",requireTrainer,async(req,res)=>{
 });
 
 // Booking
-app.post("/api/bookings/private",requireAuth,async(req,res)=>{
+app.post("/api/bookings/private",requireAuth,requireApprovedClient,async(req,res)=>{
   const {petId,service,locationType,address,startAt,notes,termsAccepted}=req.body;
   if(!["consultation","standard","extra"].includes(service)) return res.status(400).json({error:"Invalid service."});
   if(!termsAccepted)return res.status(400).json({error:"Please acknowledge the Booking Terms & Cancellation Policy before confirming."});
@@ -1254,7 +1270,7 @@ app.post("/api/my/class-enrolments/:id/cancel",requireAuth,(req,res)=>{
 });
 app.get("/api/my/training-notes",requireAuth,(req,res)=>res.json(db.prepare("SELECT n.*,p.name pet_name FROM training_notes n LEFT JOIN pets p ON p.id=n.pet_id WHERE n.user_id=? AND n.client_visible=1 ORDER BY n.created_at DESC").all(req.user.id)));
 
-app.post("/api/classes/:id/enrol",requireAuth,(req,res)=>{
+app.post("/api/classes/:id/enrol",requireAuth,requireApprovedClient,(req,res)=>{
   expireTimedHolds();
   if(!req.body.termsAccepted)return res.status(400).json({error:"Please acknowledge the Booking Terms & Cancellation Policy before confirming."});
   const c=db.prepare("SELECT * FROM classes WHERE id=?").get(req.params.id);

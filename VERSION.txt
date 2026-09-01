@@ -1,20 +1,16 @@
-The Custom Made Canine v22.0.0 — LANDING PAGE
+The Custom Made Canine v22.0.1 — CLIENT APPLICATION GATE
 
-Public landing page:
-- Who is Amy section first
-- WhatsApp Amy + Sign up immediately below
-- Existing approved reviews next
-- What Amy Offers after reviews
-- Repeat WhatsApp Amy + Sign up at the end
-- Responsive desktop / iPad / phone layout
+Corrective build for the first v22 landing-page test:
+1. Installed PWA/app identity is explicitly CMK9 in both manifests and page metadata
+2. Meet Amy no longer exposes Book private training; it offers Sign up / WhatsApp Amy
+3. Sign up now opens the new four-step New Client Application instead of the legacy registration form
+4. New application-created accounts are marked applicant and cannot create private bookings or class enrolments until approved
+5. Applicants can still enter the Client Portal and continue adding dog/profile information
+6. Desktop forms use aligned left labels / right fields and stack on iPad/phone
+7. Dog step includes the Vaccination record requirements info point
+8. Household page is optional and supports Back / Skip / Continue
+9. Application deposit structure is shown at the start and repeated at confirmation
 
-Amy dashboard:
-- Homepage Content tool
-- Add, edit, feature, hide and delete What Amy Offers cards
-- Service / Class / Event / Announcement types
-- Optional timing, price and action wording
-- Persistent database-backed content
+This build creates applicant profile columns automatically. No database reset required.
 
-The Sign up button still opens the existing registration screen. The agreed multi-page New Client Application flow is intentionally left for the next build.
-
-No database reset required.
+The actual KES 1,000 application-deposit transaction and Amy Approve / Hold / Cancel workflow are intentionally the next backend phase; this build closes the booking bypass before that is added.
