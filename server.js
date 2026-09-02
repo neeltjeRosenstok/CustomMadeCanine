@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "22.0.1-client-application";
+const APP_VERSION = "22.0.2-signup-polish";
 const STK_PUSH_ENABLED = process.env.STK_PUSH_ENABLED === "true"; // dormant future option; manual PayBill is the live payment flow
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
@@ -847,7 +847,7 @@ app.post("/api/auth/register", (req,res)=>{
   const hash=bcrypt.hashSync(password,12);
   id=db.prepare(`INSERT INTO users(role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,last_login_at,password_hash,client_status,location,client_intro_note,household_dogs,household_adults,children_0_8,children_9_13,children_14_plus,household_changes,household_note)
    VALUES('client',?,?,?,?,?,?,CURRENT_TIMESTAMP,?,?,?,?,?,?,?,?,?,?,?,?)`)
-   .run(String(name).trim(),cleanEmail,whats,whats,mpesa,newsletterOptIn?1:0,hash,applicationSignup?"applicant":"current",String(location||"").trim(),String(introNote||"").trim(),householdDogs===""||householdDogs==null?null:Number(householdDogs),householdAdults===""||householdAdults==null?null:Number(householdAdults),children0to8===""||children0to8==null?null:Number(children0to8),children9to13===""||children9to13==null?null:Number(children9to13),children14plus===""||children14plus==null?null:Number(children14plus),String(householdChanges||"").trim(),String(householdNote||"").trim()).lastInsertRowid;
+   .run(String(name).trim(),cleanEmail,whats,whats,mpesa,newsletterOptIn?1:0,hash,applicationSignup?"applicant":"current",String(location||"").trim(),String(introNote||"").trim(),householdDogs===""||householdDogs==null?null:Number(householdDogs),householdAdults===""||householdAdults==null?null:String(householdAdults).trim(),children0to8===""||children0to8==null?null:Number(children0to8),children9to13===""||children9to13==null?null:Number(children9to13),children14plus===""||children14plus==null?null:Number(children14plus),String(householdChanges||"").trim(),String(householdNote||"").trim()).lastInsertRowid;
  }catch(e){
   const nowExists=db.prepare("SELECT id FROM users WHERE email=?").get(cleanEmail);
   if(nowExists)return res.status(409).json({error:"An account with this email has just been created. Please try signing in.",code:"EMAIL_JUST_CREATED"});

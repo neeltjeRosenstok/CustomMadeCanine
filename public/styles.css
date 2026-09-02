@@ -1501,3 +1501,14 @@ input[type="password"]{text-transform:none!important}
  .application-nav,.application-nav.three-actions{display:grid;grid-template-columns:1fr}
  .application-nav button{width:100%}
 }
+
+/* v22.0.2 signup form polish */
+.application-file-field{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+.visually-hidden-file{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.file-picker-button{display:inline-flex!important;align-items:center;justify-content:center;min-height:42px!important;margin:0!important;cursor:pointer}
+.selected-file-name{display:block;max-width:100%;overflow-wrap:anywhere;line-height:1.35}
+.child-counter-row{display:grid;grid-template-columns:repeat(3,max-content);gap:18px;align-items:end}
+.child-counter-row label{display:grid;grid-template-columns:auto 58px;gap:7px;align-items:center;margin:0}
+.child-counter-row label span{white-space:nowrap}
+.child-counter-row .small-counter{width:58px!important;min-width:58px;max-width:58px;text-align:center;padding-left:5px;padding-right:5px}
+@media(max-width:520px){.child-counter-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%}.child-counter-row label{grid-template-columns:1fr;gap:3px}.child-counter-row .small-counter{width:100%!important;min-width:0;max-width:none}}

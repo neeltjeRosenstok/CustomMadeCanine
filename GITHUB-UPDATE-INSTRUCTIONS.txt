@@ -1,26 +1,3 @@
-v22.0.1 CLIENT APPLICATION GATE
-
-Replace:
-- server.js
-- package.json
-- VERSION.txt
-- GITHUB-UPDATE-INSTRUCTIONS.txt
-- public/app.js
-- public/styles.css
-- public/index.html
-- public/manifest.webmanifest
-- public/manifest.json
-
+v22.0.2 SIGNUP FORM POLISH
+Replace server.js, package.json, VERSION.txt, GITHUB-UPDATE-INSTRUCTIONS.txt, public/app.js, public/styles.css, public/index.html
 Do NOT reset the database.
-
-Because installed PWAs cache their manifest/name, uninstall any old CMC test installation once, deploy this build, refresh the site, then install again. The manifest now identifies the app as CMK9.
-
-Smoke test:
-1. Install prompt / installed name = CMK9
-2. Home → Read more about Amy: no Book private training button
-3. Home → Sign up: new multi-step application opens
-4. Back/forward retains typed values
-5. Create application account + first dog
-6. Applicant can use profile/dogs but Bookings says booking not yet available
-7. Direct attempt to POST a private booking or class enrolment as applicant is rejected by server
-8. Existing approved/current clients can still book normally
