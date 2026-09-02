@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "22.0.3-landing-signup-refine";
+const APP_VERSION = "22.0.4-batch1-application-reliability";
 const STK_PUSH_ENABLED = process.env.STK_PUSH_ENABLED === "true"; // dormant future option; manual PayBill is the live payment flow
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
@@ -840,7 +840,7 @@ app.post("/api/auth/register", (req,res)=>{
  const {name,email,whatsappPhone,mpesaPhone,password,newsletterOptIn,applicationSignup,location,introNote,householdDogs,householdAdults,children0to8,children9to13,children14plus,householdChanges,householdNote}=req.body;
  const whats=String(whatsappPhone||"").trim(),mpesa=String(mpesaPhone||"").trim()||whats,cleanEmail=String(email||"").trim().toLowerCase();
  if(!name||!cleanEmail||!whats||!password)return res.status(400).json({error:"Please complete name, WhatsApp number, email and password."});
- if(applicationSignup&&/parklands/i.test(String(location||"")))return res.status(409).json({error:"Sorry Amy does not work in this area, please contact Shells Sharma on WhatsApp using +254 733 728356",code:"PARKLANDS_UNAVAILABLE"});
+ if(applicationSignup&&/park\s*lands/i.test(String(location||"")))return res.status(409).json({error:"Sorry Amy does not work in this area, please contact KSPCA Mombasa on WhatsApp using +254 733 800495",code:"PARKLANDS_UNAVAILABLE"});
  if(!validClientEmail(cleanEmail))return res.status(400).json({error:"Please enter a valid email address."});
  if(!validNewPassword(password))return res.status(400).json({error:PASSWORD_RULE});
  if(db.prepare("SELECT id FROM users WHERE email=?").get(cleanEmail))return res.status(409).json({error:"That email is already registered. Please sign in instead.",code:"EMAIL_EXISTS"});
@@ -848,7 +848,7 @@ app.post("/api/auth/register", (req,res)=>{
  try{
   const hash=bcrypt.hashSync(password,12);
   id=db.prepare(`INSERT INTO users(role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,last_login_at,password_hash,client_status,location,client_intro_note,household_dogs,household_adults,children_0_8,children_9_13,children_14_plus,household_changes,household_note)
-   VALUES('client',?,?,?,?,?,?,CURRENT_TIMESTAMP,?,?,?,?,?,?,?,?,?,?,?,?)`)
+   VALUES('client',?,?,?,?,?,?,CURRENT_TIMESTAMP,?,?,?,?,?,?,?,?,?,?,?)`)
    .run(String(name).trim(),cleanEmail,whats,whats,mpesa,newsletterOptIn?1:0,hash,applicationSignup?"applicant":"current",String(location||"").trim(),String(introNote||"").trim(),householdDogs===""||householdDogs==null?null:Number(householdDogs),householdAdults===""||householdAdults==null?null:String(householdAdults).trim(),children0to8===""||children0to8==null?null:Number(children0to8),children9to13===""||children9to13==null?null:Number(children9to13),children14plus===""||children14plus==null?null:Number(children14plus),String(householdChanges||"").trim(),String(householdNote||"").trim()).lastInsertRowid;
  }catch(e){
   const nowExists=db.prepare("SELECT id FROM users WHERE email=?").get(cleanEmail);

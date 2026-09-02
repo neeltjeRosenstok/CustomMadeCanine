@@ -1,23 +1,14 @@
-The Custom Made Canine v22.0.3 — LANDING + SIGNUP REFINEMENT
+The Custom Made Canine v22.0.4 — BATCH 1 APPLICATION RELIABILITY
 
-Landing page
-- Softens 'What Amy Offers' to 'Training with Amy'
-- Homepage cards can remain short text items for private-training descriptions
-- Amy can optionally attach an advertising poster image to any homepage item
-- Poster and text cards can be mixed, featured, hidden, edited and removed from Homepage Content
+Batch 1 fixes only:
+- Fixed the New Client Application account-creation failure.
+  Cause: the users INSERT had one more SQL placeholder than supplied values.
+- Parklands rule now catches Parklands and Park Lands, case-insensitively.
+- Parklands referral corrected to KSPCA Mombasa, WhatsApp +254 733 800495.
+- Parklands is blocked both in the browser flow and again on the server.
+- Applicant status remains preserved across sign-out/sign-in.
+- Applicant private-booking and class-enrolment server gates remain active.
+- Fresh login screens reset Show password to unchecked.
+- Logout also clears Show password state.
 
-New Client Application
-- More prominent, left-aligned application/deposit header
-- Tighter desktop label-to-field spacing; side-by-side form persists down to 680px
-- Parklands location catch now works client-side and server-side with Shells Sharma WhatsApp referral
-- Dog/vaccination filenames display beside their chooser in a light, bold field
-- Full Vaccination record requirements shown above the vaccination chooser
-- Vaccination requirements acknowledgement required before continuing
-- Confirm & Secure name/email summary made more prominent
-- Show password row pulled closer to password fields
-- Repeated deposit box removed from final password page
-- Successful submission now shows the requested confirmation screen with NAME and WhatsApp / Client Portal actions
-- Applicants remain applicants after signing out and back in; login no longer accidentally promotes them to current/approved
-
-Vaccination uploads accept JPG, PNG, WEBP and PDF.
 No database reset required.

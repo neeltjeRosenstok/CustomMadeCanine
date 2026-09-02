@@ -255,6 +255,7 @@ function selectSlot(s){state.selectedSlot=s;render()}
 function auth(message=""){
  state.authMessage=message;
  state.authReturnToBooking=/time is selected|place is selected/i.test(String(message||""));
+ state.authShowPassword=false;
  state.authMode="choice";
  go("auth");
 }
@@ -605,7 +606,7 @@ function contactAmy(){
 async function logout(){
   try{await api("/api/auth/logout",{method:"POST"});}finally{
     state.user=null;state.profile=null;state.bookings=null;state.resources=[];state.trainingNotes=[];state.trainer=null;state.trainerCalendar=null;state.menu=false;state.view="home";
-    clearBookingDraft();state.completedBooking=null;state.authReturnToBooking=false;
+    clearBookingDraft();state.completedBooking=null;state.authReturnToBooking=false;state.authShowPassword=false;
     try{state.reviews=await api("/api/reviews");}catch(_e){}
     render();
   }
@@ -1505,7 +1506,7 @@ function applicationStepOneContinue(){
  const d=state.applicationDraft;
  if(!d.name.trim()||!d.email.trim()||!d.whatsappPhone.trim()||!d.location.trim())return appAlert("Please complete your name, email, WhatsApp number and location.");
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email.trim()))return appAlert("Please enter a valid email address.");
- if(/parklands/i.test(String(d.location||""))){state.parklandsReferralOpen=true;return render()}
+ if(/park\s*lands/i.test(String(d.location||""))){state.parklandsReferralOpen=true;return render()}
  applicationGo(2);
 }
 function applicationDogContinue(){
@@ -1530,7 +1531,7 @@ function applicationFileChosen(kind,input){
  }
 }
 function parklandsReferralModal(){
- return `<div class="modal-overlay"><div class="trainer-modal parklands-modal"><button class="close-btn modal-close" onclick="state.parklandsReferralOpen=false;render()">×</button><div class="eyebrow">Location</div><h2>Parklands</h2><p>Sorry Amy does not work in this area, please contact Shells Sharma on WhatsApp using <b>+254 733 728356</b></p><div class="actions"><button class="secondary" onclick="state.parklandsReferralOpen=false;render()">Close</button><button class="primary" onclick="window.open('https://wa.me/254733728356','_blank')">WhatsApp Shells Sharma</button></div></div></div>`;
+ return `<div class="modal-overlay"><div class="trainer-modal parklands-modal"><button class="close-btn modal-close" onclick="state.parklandsReferralOpen=false;render()">×</button><div class="eyebrow">Location</div><h2>Parklands / Park Lands</h2><p>Sorry Amy does not work in this area, please contact <b>KSPCA Mombasa</b> on WhatsApp using <b>+254 733 800495</b>.</p><div class="actions"><button class="secondary" onclick="state.parklandsReferralOpen=false;render()">Close</button><button class="primary" onclick="window.open('https://wa.me/254733800495','_blank')">WhatsApp KSPCA Mombasa</button></div></div></div>`;
 }
 function vaccinationRequirements(){
  return `<div class="modal-overlay"><div class="trainer-modal"><button class="close-btn modal-close" onclick="state.vaccinationInfoOpen=false;render()">×</button><div class="eyebrow">Dog profile</div><h2>Vaccination record requirements</h2><p>Please upload clear photographs of your dog's vaccination record or passport pages.</p><p>These must show a valid and complete record of Parvo, DHLP and Rabies vaccination showing the vaccine sticker/batch label, date, validity/expiry, as well as your vet's stamp clearly reflecting their KVB number and signature.</p><p>Amy to be able to read the dog's details, vaccine details and dates.</p><p>You can add or replace vaccination information later from the dog's profile.</p><div class="actions"><button class="primary" onclick="state.vaccinationInfoOpen=false;render()">Close</button></div></div></div>`;
@@ -1570,7 +1571,7 @@ function authView(){
  ${hasBooking?`<div class="notice good saved-notice"><b>✓ Your booking choices are saved.</b><br>They will stay here while you log in or sign up.</div>`:''}
  <p class="auth-message">${esc(state.authMessage||'Please log in or sign up to access your Client Portal')}</p>
  ${state.authMode==='choice'?`<div class="auth-choice-grid">
-   <button class="auth-choice" onclick="state.authMode='login';render()"><strong>Log in</strong><span>I already have an account</span></button>
+   <button class="auth-choice" onclick="state.authShowPassword=false;state.authMode='login';render()"><strong>Log in</strong><span>I already have an account</span></button>
    <button class="auth-choice" onclick="state.authMode='register';render()"><strong>Sign up</strong><span>I'm new here</span></button>
  </div>`:`<button class="back auth-back" onclick="state.authMode='choice';render()">← Choose another option</button>
  ${register?`<label>Name<input id="authName" autocomplete="name" value="${esc(draft.name||'')}"></label><label>WhatsApp number<input id="authWhatsapp" placeholder="07… or 2547…" autocomplete="tel" value="${esc(draft.whatsappPhone||'')}"></label><label>M-Pesa number <span class="small">(if different)</span><input id="authMpesa" placeholder="Leave blank if same as WhatsApp" autocomplete="tel" value="${esc(draft.mpesaPhone||'')}"></label>`:''}
