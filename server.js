@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "22.0.2-signup-polish";
+const APP_VERSION = "22.0.3-landing-signup-refine";
 const STK_PUSH_ENABLED = process.env.STK_PUSH_ENABLED === "true"; // dormant future option; manual PayBill is the live payment flow
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
@@ -515,6 +515,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS homepage_items (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );`);
+try { db.exec("ALTER TABLE homepage_items ADD COLUMN poster_filename TEXT"); } catch {}
 
 try { db.exec("ALTER TABLE classes ADD COLUMN location_type TEXT NOT NULL DEFAULT 'arena'"); } catch {}
 try { db.exec("ALTER TABLE classes ADD COLUMN location_name TEXT"); } catch {}
@@ -681,7 +682,7 @@ const imageUpload = multer({
   }),
   limits: {fileSize: 20 * 1024 * 1024, files: 7},
   fileFilter: (_, file, cb) => {
-    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    const allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
     cb(null, allowed.includes(file.mimetype));
   }
 });
@@ -839,6 +840,7 @@ app.post("/api/auth/register", (req,res)=>{
  const {name,email,whatsappPhone,mpesaPhone,password,newsletterOptIn,applicationSignup,location,introNote,householdDogs,householdAdults,children0to8,children9to13,children14plus,householdChanges,householdNote}=req.body;
  const whats=String(whatsappPhone||"").trim(),mpesa=String(mpesaPhone||"").trim()||whats,cleanEmail=String(email||"").trim().toLowerCase();
  if(!name||!cleanEmail||!whats||!password)return res.status(400).json({error:"Please complete name, WhatsApp number, email and password."});
+ if(applicationSignup&&/parklands/i.test(String(location||"")))return res.status(409).json({error:"Sorry Amy does not work in this area, please contact Shells Sharma on WhatsApp using +254 733 728356",code:"PARKLANDS_UNAVAILABLE"});
  if(!validClientEmail(cleanEmail))return res.status(400).json({error:"Please enter a valid email address."});
  if(!validNewPassword(password))return res.status(400).json({error:PASSWORD_RULE});
  if(db.prepare("SELECT id FROM users WHERE email=?").get(cleanEmail))return res.status(409).json({error:"That email is already registered. Please sign in instead.",code:"EMAIL_EXISTS"});
@@ -861,7 +863,7 @@ app.post("/api/auth/login",(req,res)=>{
   const {email,password}=req.body;
   const u=db.prepare("SELECT * FROM users WHERE email=?").get(String(email||"").toLowerCase());
   if (!u || !u.password_hash || !bcrypt.compareSync(password||"",u.password_hash)) return res.status(401).json({error:"Incorrect email or password."});
-  db.prepare("UPDATE users SET last_login_at=CURRENT_TIMESTAMP,status_override=NULL,client_status='current' WHERE id=?").run(u.id);
+  db.prepare("UPDATE users SET last_login_at=CURRENT_TIMESTAMP,status_override=NULL WHERE id=?").run(u.id);
   if(u.role==='client')logActivity({userId:u.id,actorUserId:u.id,actorRole:'client',action:'client_login',details:'Client signed in.'});
   req.session = {userId:u.id, appVersion:APP_VERSION};
   res.json({user:currentUser(req)});
@@ -943,9 +945,16 @@ app.get("/api/reviews/:id/photo",(req,res)=>{
 });
 
 app.get("/api/homepage-items",(req,res)=>{
-  const rows=db.prepare(`SELECT id,item_type,title,description,date_text,price_text,action_label,action_type,featured,sort_order
+  const rows=db.prepare(`SELECT id,item_type,title,description,date_text,price_text,action_label,action_type,featured,sort_order,poster_filename
     FROM homepage_items WHERE active=1 ORDER BY featured DESC,sort_order ASC,id DESC`).all();
-  res.json(rows);
+  res.json(rows.map(r=>({...r,poster_url:r.poster_filename?`/api/homepage-items/${r.id}/poster`:null})));
+});
+app.get("/api/homepage-items/:id/poster",(req,res)=>{
+  const row=db.prepare("SELECT poster_filename,active FROM homepage_items WHERE id=?").get(req.params.id);
+  if(!row||!row.active||!row.poster_filename)return res.status(404).end();
+  const full=path.join(PRIVATE_UPLOAD_DIR,row.poster_filename);
+  if(!fs.existsSync(full))return res.status(404).end();
+  res.sendFile(full);
 });
 app.get("/api/trainer/homepage-items",requireTrainer,(req,res)=>{
   res.json(db.prepare(`SELECT * FROM homepage_items ORDER BY active DESC,featured DESC,sort_order ASC,id DESC`).all());
@@ -987,9 +996,30 @@ app.put("/api/trainer/homepage-items/:id",requireTrainer,(req,res)=>{
     .run(itemType,title,description,dateText,priceText,actionLabel,actionType,b.featured===undefined?existing.featured:(b.featured?1:0),b.active===undefined?existing.active:(b.active?1:0),Number.isFinite(Number(b.sortOrder))?Number(b.sortOrder):existing.sort_order,req.params.id);
   res.json(db.prepare("SELECT * FROM homepage_items WHERE id=?").get(req.params.id));
 });
-app.delete("/api/trainer/homepage-items/:id",requireTrainer,(req,res)=>{
-  const row=db.prepare("SELECT id FROM homepage_items WHERE id=?").get(req.params.id);
+app.post("/api/trainer/homepage-items/:id/poster",requireTrainer,imageUpload.single("poster"),(req,res)=>{
+  const row=db.prepare("SELECT * FROM homepage_items WHERE id=?").get(req.params.id);
   if(!row)return res.status(404).json({error:"Homepage item not found."});
+  if(!req.file)return res.status(400).json({error:"Please choose a JPG, PNG or WEBP poster image."});
+  if(!String(req.file.mimetype||"").startsWith("image/")){
+    try{fs.unlinkSync(path.join(PRIVATE_UPLOAD_DIR,req.file.filename))}catch{}
+    return res.status(400).json({error:"Homepage posters must be an image file."});
+  }
+  if(row.poster_filename){try{fs.unlinkSync(path.join(PRIVATE_UPLOAD_DIR,row.poster_filename))}catch{}}
+  db.prepare("UPDATE homepage_items SET poster_filename=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(req.file.filename,req.params.id);
+  res.json({ok:true,poster_url:`/api/homepage-items/${req.params.id}/poster`});
+});
+app.delete("/api/trainer/homepage-items/:id/poster",requireTrainer,(req,res)=>{
+  const row=db.prepare("SELECT poster_filename FROM homepage_items WHERE id=?").get(req.params.id);
+  if(!row)return res.status(404).json({error:"Homepage item not found."});
+  if(row.poster_filename){try{fs.unlinkSync(path.join(PRIVATE_UPLOAD_DIR,row.poster_filename))}catch{}}
+  db.prepare("UPDATE homepage_items SET poster_filename=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(req.params.id);
+  res.json({ok:true});
+});
+
+app.delete("/api/trainer/homepage-items/:id",requireTrainer,(req,res)=>{
+  const row=db.prepare("SELECT id,poster_filename FROM homepage_items WHERE id=?").get(req.params.id);
+  if(!row)return res.status(404).json({error:"Homepage item not found."});
+  if(row.poster_filename){try{fs.unlinkSync(path.join(PRIVATE_UPLOAD_DIR,row.poster_filename))}catch{}}
   db.prepare("DELETE FROM homepage_items WHERE id=?").run(req.params.id);
   res.json({ok:true});
 });

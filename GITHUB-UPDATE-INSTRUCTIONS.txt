@@ -1,3 +1,27 @@
-v22.0.2 SIGNUP FORM POLISH
-Replace server.js, package.json, VERSION.txt, GITHUB-UPDATE-INSTRUCTIONS.txt, public/app.js, public/styles.css, public/index.html
+v22.0.3 LANDING + SIGNUP REFINEMENT
+
+Replace:
+- server.js
+- package.json
+- VERSION.txt
+- GITHUB-UPDATE-INSTRUCTIONS.txt
+- public/app.js
+- public/styles.css
+- public/index.html
+
 Do NOT reset the database.
+
+A poster_filename column is added automatically to homepage_items.
+
+Focused smoke test:
+1. Homepage heading is Training with Amy
+2. Amy Dashboard > Homepage Content: create short private-training text card
+3. Add a JPG/PNG/WEBP poster to a homepage item and confirm it displays publicly
+4. Parklands location triggers Shells Sharma referral and cannot proceed
+5. Desktop form label/field spacing is visibly tighter
+6. Dog photo filename appears beside Choose photo
+7. Vaccination requirements are visible above chooser and acknowledgement is required
+8. Vaccination photo/PDF filename appears beside chooser
+9. Confirm & Secure summary is prominent; Show password does not wipe passwords
+10. Submit creates applicant and shows requested thank-you confirmation
+11. Sign applicant out/in again; booking must remain locked
