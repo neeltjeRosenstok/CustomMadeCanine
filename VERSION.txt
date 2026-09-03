@@ -1,23 +1,13 @@
-The Custom Made Canine v22.0.5 — BATCH 2 CLIENT APPLICATION POLISH + DEPOSIT PAYMENT
+The Custom Made Canine v22.0.6 — BATCH 3 CLIENT RECORDS & REPORTS
 
-Changes in this batch:
-- Note for Amy: removed the duplicate helper sentence under the textarea.
-- Safer application navigation: Back is visually quieter and removed from normal Tab order; Continue is the next action after Note for Amy.
-- Application fields are preserved when using Back during the wizard.
-- Household step: removed the Skip this section button; optional fields can simply be left blank.
-- Back and Continue remain side-by-side on phone layouts where practical.
-- Vaccination requirements are explicitly left aligned.
-- WhatsApp signup field accepts numbers, spaces and a leading + only.
-- Kenyan WhatsApp numbers are stored with readable spaces when their format is recognised.
-- Optional M-Pesa signup field validates Kenyan 07 / 01 and +254 7 / +254 1 formats.
-- Valid M-Pesa numbers are stored as text with spaces, e.g. 0722 123456 or +254 700 123456.
-- Parklands / Park Lands wording corrected to Shels Sharma, +254 733 800495.
-- Final application button is now Submit & Pay.
-- Added KES 1,000 New Client Application manual M-Pesa PayBill page using the existing exact QR asset.
-- Application payment confirmation requires a 10-character uppercase/alphanumeric M-Pesa reference.
-- Account setup completion is shown only after the application payment reference has been submitted.
-- Application deposit submissions appear in Amy's Needs Attention area for verify/reject.
-- If an applicant leaves before paying, My Bookings offers Complete application payment.
-- Restricted My Bookings wording now says: Amy needs to approve your application before you can book training or classes.
+- New Client Applications separated from approved clients with meaningful stages.
+- Amy can see full application/household/dog/deposit details.
+- Submitted application deposits appear in Payments Report as UNVERIFIED; verified ones as Verified.
+- Explicit approval after deposit verification.
+- Location renamed Area; Google Maps pin/current-location field added and stored.
+- Client Portal vaccination wording matches signup behind a small info control, without acknowledgement; PDF accepted.
+- Training Resources Back to Dashboard aligned left.
+- Printable client report builder with date range presets/custom dates and selectable header/client/household/individual dogs/history/training notes/payments/resources.
+- Resource shares carry date stamps.
 
-No database reset required. application_deposits is created additively and idempotently.
+No database reset required.
