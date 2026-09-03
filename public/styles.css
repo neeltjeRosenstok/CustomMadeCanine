@@ -1658,3 +1658,21 @@ input[type="password"]{text-transform:none!important}
 .vaccination-info-button:hover,.vaccination-info-button:focus-visible{
   background:var(--cream);
 }
+
+/* v22.0.7 Batch 3A — New Client management */
+.client-status-filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.client-status-badge{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:4px 9px;font-size:.76rem;font-weight:800;white-space:nowrap;border:1px solid rgba(37,33,94,.18);background:rgba(255,255,255,.72)}
+.client-status-badge.status-unverified{background:#fff3cf}
+.client-status-badge.status-incomplete{background:#edf3ff}
+.client-status-badge.status-current{background:#e8f6ed}
+.client-status-badge.status-rejected{background:#fde8e8}
+.client-overview-card.status-unverified{border-left:5px solid #b98400}
+.client-overview-card.status-incomplete{border-left:5px solid #6679b8}
+.client-overview-card.status-current{border-left:5px solid #4f8a61}
+.client-overview-card.status-rejected{border-left:5px solid #a53c3c}
+.client-status-detail{display:block;text-align:left;font-size:.86rem;font-weight:700;margin:6px 0 2px}
+.application-review-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:8px 0 16px}
+.application-review-grid>div{padding:11px;border:1px solid rgba(37,33,94,.14);border-radius:10px;background:rgba(255,255,255,.48)}
+.application-review-grid p{margin:.3rem 0 0;white-space:pre-wrap}
+.client-decision-actions{margin-top:16px;flex-wrap:wrap}
+@media(max-width:760px){.application-review-grid{grid-template-columns:1fr}.client-status-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.client-status-filters button{width:100%}}

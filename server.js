@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "22.0.6-batch2.1";
+const APP_VERSION = "22.0.7-batch3a";
 const STK_PUSH_ENABLED = process.env.STK_PUSH_ENABLED === "true"; // dormant future option; manual PayBill is the live payment flow
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
@@ -375,6 +375,8 @@ function futureClientCommitment(userId){
  return false;
 }
 function calculatedClientStatus(u){
+ const raw=String(u.client_status||'current');
+ if(['applicant','unverified','rejected'].includes(raw))return raw==='applicant'?'unverified':raw;
  if(u.status_override&&['current','dormant','archived'].includes(u.status_override))return u.status_override;
  if(futureClientCommitment(u.id))return 'current';
  const basis=u.last_login_at||u.created_at; if(!basis)return 'current';
@@ -648,6 +650,50 @@ db.exec(`CREATE TABLE IF NOT EXISTS application_deposits (
  verified_at TEXT,
  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );`);
+try { db.exec("ALTER TABLE application_deposits ADD COLUMN refund_amount INTEGER"); } catch {}
+try { db.exec("ALTER TABLE application_deposits ADD COLUMN refund_method TEXT"); } catch {}
+try { db.exec("ALTER TABLE application_deposits ADD COLUMN refund_reference TEXT"); } catch {}
+try { db.exec("ALTER TABLE application_deposits ADD COLUMN refunded_at TEXT"); } catch {}
+try { db.exec("ALTER TABLE application_deposits ADD COLUMN decision_status TEXT"); } catch {}
+
+db.exec(`CREATE TABLE IF NOT EXISTS application_drafts (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ email TEXT NOT NULL UNIQUE,
+ name TEXT NOT NULL,
+ whatsapp_phone TEXT NOT NULL,
+ mpesa_phone TEXT,
+ newsletter_opt_in INTEGER NOT NULL DEFAULT 0,
+ location TEXT,
+ intro_note TEXT,
+ dog_name TEXT,
+ dog_breed TEXT,
+ dog_gender TEXT,
+ dog_dob TEXT,
+ household_dogs INTEGER,
+ household_adults TEXT,
+ children_0_8 INTEGER,
+ children_9_13 INTEGER,
+ children_14_plus INTEGER,
+ household_changes TEXT,
+ household_note TEXT,
+ last_step INTEGER NOT NULL DEFAULT 1,
+ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_application_drafts_updated ON application_drafts(updated_at);
+CREATE TABLE IF NOT EXISTS rejected_client_archive (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ original_user_id INTEGER,
+ name TEXT,
+ email TEXT,
+ whatsapp_phone TEXT,
+ rejected_at TEXT,
+ deleted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ snapshot_json TEXT NOT NULL,
+ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_rejected_client_archive_email ON rejected_client_archive(email,deleted_at);
+`);
 try { db.exec("UPDATE pets SET vaccination_status='pending' WHERE vaccination_status='not_provided' AND id IN (SELECT pet_id FROM pet_files WHERE kind='vaccination')"); } catch {}
 
 
@@ -865,6 +911,34 @@ async function initiateMpesa(phone,amount,accountRef) {
 }
 
 // Auth
+function applicationDraftPublic(row){
+ if(!row)return null;
+ return {id:row.id,email:row.email,name:row.name,whatsappPhone:row.whatsapp_phone,mpesaPhone:row.mpesa_phone||"",newsletterOptIn:!!row.newsletter_opt_in,location:row.location||"",introNote:row.intro_note||"",dogName:row.dog_name||"",dogBreed:row.dog_breed||"",dogGender:row.dog_gender||"",dogDob:row.dog_dob||"",householdDogs:row.household_dogs??"",householdAdults:row.household_adults??"",children0to8:row.children_0_8??"",children9to13:row.children_9_13??"",children14plus:row.children_14_plus??"",householdChanges:row.household_changes||"",householdNote:row.household_note||"",lastStep:Number(row.last_step||1)};
+}
+app.post("/api/application-drafts/save",(req,res)=>{
+ const b=req.body||{},cleanEmail=String(b.email||"").trim().toLowerCase(),name=String(b.name||"").trim(),whatsRaw=String(b.whatsappPhone||"").trim();
+ if(!name||!cleanEmail||!whatsRaw)return res.status(400).json({error:"Please complete your name, email and WhatsApp number first."});
+ if(!validClientEmail(cleanEmail))return res.status(400).json({error:"Please enter a valid email address."});
+ if(!validWhatsappPhone(whatsRaw))return res.status(400).json({error:"WhatsApp number may contain numbers, spaces and a leading + only."});
+ const existingUser=db.prepare("SELECT id,client_status FROM users WHERE email=?").get(cleanEmail);
+ if(existingUser)return res.status(409).json({error:"That email already has a client account. Please sign in to continue.",code:"EMAIL_EXISTS"});
+ const existing=db.prepare("SELECT * FROM application_drafts WHERE email=?").get(cleanEmail);
+ if(existing){
+   const oldDigits=String(existing.whatsapp_phone||"").replace(/\D/g,""); const newDigits=whatsRaw.replace(/\D/g,"");
+   const oldName=String(existing.name||"").trim().toLowerCase(),newName=name.toLowerCase();
+   if((oldDigits&&newDigits&&oldDigits!==newDigits)||(oldName&&newName&&oldName!==newName))return res.status(409).json({error:"An incomplete application already exists for this email. Please use the same name and WhatsApp number you entered when you started it.",code:"DRAFT_CONTACT_MISMATCH"});
+ }
+ const mpesaRaw=String(b.mpesaPhone||"").trim(); const formattedMpesa=mpesaRaw?normalizeKenyanMpesaPhone(mpesaRaw):"";
+ if(mpesaRaw&&!formattedMpesa)return res.status(400).json({error:"Enter a valid Kenyan M-Pesa number."});
+ const step=Math.max(1,Math.min(3,Number(b.lastStep||1)));
+ db.prepare(`INSERT INTO application_drafts(email,name,whatsapp_phone,mpesa_phone,newsletter_opt_in,location,intro_note,dog_name,dog_breed,dog_gender,dog_dob,household_dogs,household_adults,children_0_8,children_9_13,children_14_plus,household_changes,household_note,last_step)
+   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+   ON CONFLICT(email) DO UPDATE SET name=excluded.name,whatsapp_phone=excluded.whatsapp_phone,mpesa_phone=COALESCE(NULLIF(excluded.mpesa_phone,''),application_drafts.mpesa_phone),newsletter_opt_in=excluded.newsletter_opt_in,location=COALESCE(NULLIF(excluded.location,''),application_drafts.location),intro_note=COALESCE(NULLIF(excluded.intro_note,''),application_drafts.intro_note),dog_name=COALESCE(NULLIF(excluded.dog_name,''),application_drafts.dog_name),dog_breed=COALESCE(NULLIF(excluded.dog_breed,''),application_drafts.dog_breed),dog_gender=COALESCE(NULLIF(excluded.dog_gender,''),application_drafts.dog_gender),dog_dob=COALESCE(NULLIF(excluded.dog_dob,''),application_drafts.dog_dob),household_dogs=COALESCE(excluded.household_dogs,application_drafts.household_dogs),household_adults=COALESCE(NULLIF(excluded.household_adults,''),application_drafts.household_adults),children_0_8=COALESCE(excluded.children_0_8,application_drafts.children_0_8),children_9_13=COALESCE(excluded.children_9_13,application_drafts.children_9_13),children_14_plus=COALESCE(excluded.children_14_plus,application_drafts.children_14_plus),household_changes=COALESCE(NULLIF(excluded.household_changes,''),application_drafts.household_changes),household_note=COALESCE(NULLIF(excluded.household_note,''),application_drafts.household_note),last_step=MAX(application_drafts.last_step,excluded.last_step),updated_at=CURRENT_TIMESTAMP`)
+   .run(cleanEmail,name,whatsRaw,formattedMpesa||"",b.newsletterOptIn?1:0,String(b.location||"").trim(),String(b.introNote||"").trim(),String(b.dogName||"").trim(),String(b.dogBreed||"").trim(),String(b.dogGender||"").trim(),String(b.dogDob||"").trim(),b.householdDogs===""||b.householdDogs==null?null:Number(b.householdDogs),b.householdAdults===""||b.householdAdults==null?null:String(b.householdAdults).trim(),b.children0to8===""||b.children0to8==null?null:Number(b.children0to8),b.children9to13===""||b.children9to13==null?null:Number(b.children9to13),b.children14plus===""||b.children14plus==null?null:Number(b.children14plus),String(b.householdChanges||"").trim(),String(b.householdNote||"").trim(),step);
+ const row=db.prepare("SELECT * FROM application_drafts WHERE email=?").get(cleanEmail);
+ res.json({ok:true,resumed:!!existing,draft:applicationDraftPublic(row)});
+});
+
 app.post("/api/auth/register", (req,res)=>{
  const {name,email,whatsappPhone,mpesaPhone,password,newsletterOptIn,applicationSignup,location,introNote,householdDogs,householdAdults,children0to8,children9to13,children14plus,householdChanges,householdNote}=req.body;
  const whatsRaw=String(whatsappPhone||"").trim(),mpesaRaw=String(mpesaPhone||"").trim(),cleanEmail=String(email||"").trim().toLowerCase();
@@ -889,6 +963,7 @@ app.post("/api/auth/register", (req,res)=>{
   if(nowExists)return res.status(409).json({error:"An account with this email has just been created. Please try signing in.",code:"EMAIL_JUST_CREATED"});
   console.error("Registration insert failed:",e);return res.status(500).json({error:"Your account could not be created. Please try again."});
  }
+ if(applicationSignup){try{db.prepare("DELETE FROM application_drafts WHERE email=?").run(cleanEmail)}catch(e){console.error("Could not clear completed application draft:",e.message)}}
  try{logActivity({userId:Number(id),actorUserId:Number(id),actorRole:"client",action:"account_created",details:`New client account created — ${String(name).trim()}.`})}catch(e){console.error(e)}
  try{notifyTrainer({userId:Number(id),kind:"new_account",message:`New client account created — ${String(name).trim()}.`})}catch(e){console.error(e)}
  req.session={userId:id,appVersion:APP_VERSION};res.json({user:currentUser(req)});
@@ -1502,8 +1577,13 @@ app.post("/api/trainer/application-deposits/:id/verify",requireTrainer,(req,res)
  if(!row||row.manual_payment_status!=='submitted')return res.status(404).json({error:"Application deposit submission not found."});
  const approve=!!req.body.approve;
  if(approve){
-  db.prepare("UPDATE application_deposits SET manual_payment_status='verified',verified_at=CURRENT_TIMESTAMP WHERE id=?").run(row.id);
-  logActivity({userId:row.user_id,actorUserId:req.user.id,actorRole:'trainer',action:'application_deposit_verified',details:`Application deposit verified — KES 1,000 · M-Pesa ${row.manual_payment_code}.`});
+  const tx=db.transaction(()=>{
+   db.prepare("UPDATE application_deposits SET manual_payment_status='verified',verified_at=CURRENT_TIMESTAMP,decision_status='approved' WHERE id=?").run(row.id);
+   db.prepare("UPDATE users SET client_status='current',status_override=NULL WHERE id=?").run(row.user_id);
+   const already=db.prepare("SELECT 1 FROM client_credit_ledger WHERE user_id=? AND source_type='application_deposit' AND source_id=?").get(row.user_id,row.id);
+   if(!already)addClientCredit(row.user_id,700,'application_deposit',row.id,'New Client Application — approved KES 700 credit.');
+  });tx();
+  logActivity({userId:row.user_id,actorUserId:req.user.id,actorRole:'trainer',action:'application_approved',details:`Application approved — KES 1,000 deposit verified; KES 700 credited to account · M-Pesa ${row.manual_payment_code}.`});
  }else{
   db.prepare("UPDATE application_deposits SET manual_payment_status='rejected',manual_payment_code=NULL,submitted_at=NULL WHERE id=?").run(row.id);
   logActivity({userId:row.user_id,actorUserId:req.user.id,actorRole:'trainer',action:'application_deposit_rejected',details:'Application deposit reference rejected; client may resubmit.'});
@@ -1511,6 +1591,46 @@ app.post("/api/trainer/application-deposits/:id/verify",requireTrainer,(req,res)
  db.prepare("UPDATE trainer_notifications SET resolved=1 WHERE kind='application_deposit' AND user_id=?").run(row.user_id);
  res.json({ok:true});
 });
+
+app.post("/api/trainer/clients/:id/reject-application",requireTrainer,(req,res)=>{
+ const u=db.prepare("SELECT * FROM users WHERE id=? AND role='client'").get(req.params.id); if(!u)return res.status(404).json({error:'Client not found.'});
+ if(String(u.client_status||'')==='current')return res.status(409).json({error:'Current clients cannot be rejected from the new-client queue.'});
+ const d=db.prepare("SELECT * FROM application_deposits WHERE user_id=?").get(u.id);
+ const refundMethod=String(req.body.refundMethod||'').trim().toLowerCase();
+ const refundReference=normalizeMpesaReference(req.body.refundReference||'');
+ const refundAmount=d&&d.manual_payment_status==='submitted'?700:0;
+ if(refundAmount>0&&!['cash','mpesa'].includes(refundMethod))return res.status(400).json({error:'Choose Cash or M-Pesa for the KES 700 refund.'});
+ if(refundAmount>0&&refundMethod==='mpesa'&&!/^[A-Z0-9]{10}$/.test(refundReference))return res.status(400).json({error:'Enter the full 10-character M-Pesa refund/reference code.'});
+ const tx=db.transaction(()=>{
+   db.prepare("UPDATE users SET client_status='rejected',status_override=NULL WHERE id=?").run(u.id);
+   if(d)db.prepare("UPDATE application_deposits SET decision_status='rejected',manual_payment_status=CASE WHEN ?>0 THEN 'verified' ELSE manual_payment_status END,verified_at=CASE WHEN ?>0 THEN CURRENT_TIMESTAMP ELSE verified_at END,refund_amount=?,refund_method=?,refund_reference=?,refunded_at=CASE WHEN ?>0 THEN CURRENT_TIMESTAMP ELSE refunded_at END WHERE id=?")
+     .run(refundAmount,refundAmount,refundAmount,refundAmount?refundMethod:null,refundAmount&&refundMethod==='mpesa'?refundReference:null,refundAmount,d.id);
+ });tx();
+ logActivity({userId:u.id,actorUserId:req.user.id,actorRole:'trainer',action:'application_rejected',details:refundAmount?`Application rejected — KES 700 refunded by ${refundMethod==='mpesa'?`M-Pesa ${refundReference}`:'Cash'}.`:'Application rejected before a deposit was submitted.'});
+ res.json({ok:true,refundAmount});
+});
+
+app.delete("/api/trainer/application-drafts/:id",requireTrainer,(req,res)=>{
+ const row=db.prepare("SELECT * FROM application_drafts WHERE id=?").get(req.params.id);if(!row)return res.status(404).json({error:'Incomplete application not found.'});
+ db.prepare("DELETE FROM application_drafts WHERE id=?").run(row.id);
+ res.json({ok:true});
+});
+app.get("/api/trainer/application-drafts/:id",requireTrainer,(req,res)=>{
+ const row=db.prepare("SELECT * FROM application_drafts WHERE id=?").get(req.params.id);if(!row)return res.status(404).json({error:'Incomplete application not found.'});
+ res.json({record_type:'draft',user:{id:row.id,name:row.name,email:row.email,whatsapp_phone:row.whatsapp_phone,mpesa_phone:row.mpesa_phone,newsletter_opt_in:row.newsletter_opt_in,location:row.location,client_intro_note:row.intro_note,household_dogs:row.household_dogs,household_adults:row.household_adults,children_0_8:row.children_0_8,children_9_13:row.children_9_13,children_14_plus:row.children_14_plus,household_changes:row.household_changes,household_note:row.household_note,client_status:'incomplete',created_at:row.created_at,updated_at:row.updated_at},draft:applicationDraftPublic(row),pets:row.dog_name?[{id:null,name:row.dog_name,breed:row.dog_breed,gender:row.dog_gender,date_of_birth:row.dog_dob,archived:0}]:[],creditBalance:0,creditHistory:[],bookings:[],packages:[],classes:[],resources:[],activity:[]});
+});
+
+app.delete("/api/trainer/clients/:id/rejected",requireTrainer,(req,res)=>{
+ const u=db.prepare("SELECT * FROM users WHERE id=? AND role='client'").get(req.params.id);if(!u)return res.status(404).json({error:'Client not found.'});
+ if(String(u.client_status||'')!=='rejected')return res.status(409).json({error:'Only rejected clients can be deleted this way.'});
+ const snapshot={user:u,pets:petDetailsForUser(u.id,true),applicationDeposit:db.prepare("SELECT * FROM application_deposits WHERE user_id=?").get(u.id)||null,creditHistory:db.prepare("SELECT * FROM client_credit_ledger WHERE user_id=? ORDER BY created_at").all(u.id),activity:db.prepare("SELECT * FROM activity_history WHERE user_id=? ORDER BY created_at").all(u.id)};
+ const dep=snapshot.applicationDeposit;
+ db.prepare("INSERT INTO rejected_client_archive(original_user_id,name,email,whatsapp_phone,rejected_at,snapshot_json) VALUES(?,?,?,?,?,?)")
+   .run(u.id,u.name,u.email,u.whatsapp_phone||u.phone||'',dep?.refunded_at||new Date().toISOString(),JSON.stringify(snapshot));
+ db.prepare("DELETE FROM users WHERE id=?").run(u.id);
+ res.json({ok:true});
+});
+
 
 app.post("/api/my/pets",requireAuth,imageUpload.fields([
   {name:"dogPhoto",maxCount:1},
@@ -2458,13 +2578,16 @@ app.post("/api/trainer/reviews/:id/status",requireTrainer,(req,res)=>{
 });
 app.get("/api/trainer/clients",requireTrainer,(req,res)=>{
   expireTimedHolds();
-  const users=db.prepare("SELECT id,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,created_at,last_login_at,status_override,COALESCE(client_status,'current') client_status FROM users WHERE role='client' ORDER BY name").all();
+  const users=db.prepare("SELECT id,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,location,client_intro_note,created_at,last_login_at,status_override,COALESCE(client_status,'current') client_status FROM users WHERE role='client' ORDER BY name").all();
   const petRows=db.prepare(`SELECT p.id,p.user_id,p.name,p.gender,p.date_of_birth,p.archived,(SELECT COUNT(*) FROM bookings b WHERE b.pet_id=p.id AND b.status!='cancelled') private_count,(SELECT COUNT(*) FROM class_enrolments e WHERE e.pet_id=p.id AND e.enrolment_status='active') class_count FROM pets p ORDER BY p.archived,p.name`).all();
-  res.json(users.map(u=>({...u,client_status:calculatedClientStatus(u),pets:petRows.filter(p=>p.user_id===u.id)})));
+  const depositQ=db.prepare("SELECT id,amount,manual_payment_code,manual_payment_status,submitted_at,verified_at,refund_amount,refund_method,refund_reference,refunded_at,decision_status FROM application_deposits WHERE user_id=?");
+  const completed=users.map(u=>{const raw=String(u.client_status||'current'),activityStatus=calculatedClientStatus(u);return {...u,record_type:'client',client_status:raw==='applicant'?'unverified':raw==='rejected'?'rejected':'current',activity_status:['dormant','archived'].includes(activityStatus)?activityStatus:'current',applicationDeposit:depositQ.get(u.id)||null,pets:petRows.filter(p=>p.user_id===u.id)}});
+  const drafts=db.prepare("SELECT * FROM application_drafts ORDER BY updated_at DESC").all().map(d=>({id:d.id,record_type:'draft',name:d.name,email:d.email,phone:d.whatsapp_phone,whatsapp_phone:d.whatsapp_phone,mpesa_phone:d.mpesa_phone,newsletter_opt_in:d.newsletter_opt_in,location:d.location,client_intro_note:d.intro_note,created_at:d.created_at,updated_at:d.updated_at,client_status:'incomplete',pets:d.dog_name?[{id:null,name:d.dog_name,gender:d.dog_gender,date_of_birth:d.dog_dob,archived:0}]:[]}));
+  res.json([...drafts,...completed]);
 });
 app.get("/api/trainer/client/:id",requireTrainer,(req,res)=>{
-  const user=db.prepare("SELECT id,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,created_at,last_login_at,status_override,COALESCE(client_status,'current') client_status FROM users WHERE id=? AND role='client'").get(req.params.id);
-  if(!user)return res.status(404).json({error:"Client not found."}); user.client_status=calculatedClientStatus(user);
+  const user=db.prepare("SELECT id,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,location,client_intro_note,household_dogs,household_adults,children_0_8,children_9_13,children_14_plus,household_changes,household_note,created_at,last_login_at,status_override,COALESCE(client_status,'current') client_status FROM users WHERE id=? AND role='client'").get(req.params.id);
+  if(!user)return res.status(404).json({error:"Client not found."}); const rawClientStatus=String(user.client_status||'current'); user.activity_status=calculatedClientStatus(user); user.client_status=rawClientStatus==='applicant'?'unverified':rawClientStatus==='rejected'?'rejected':'current';
   const resources=db.prepare(`
     SELECT DISTINCT r.id,r.title,r.type,r.category,
       COALESCE((SELECT a2.note FROM resource_access a2 WHERE a2.resource_id=r.id AND a2.user_id=? ORDER BY a2.id DESC LIMIT 1),
@@ -2473,7 +2596,8 @@ app.get("/api/trainer/client/:id",requireTrainer,(req,res)=>{
     WHERE r.archived=0 AND (a.user_id=? OR a.class_id IN (SELECT class_id FROM class_enrolments WHERE user_id=? AND enrolment_status='active' AND payment_status IN ('paid','demo_paid','credit_paid')))
     ORDER BY COALESCE(r.category,'General'),r.type,r.title
   `).all(user.id,user.id,user.id,user.id);
-  res.json({user,pets:petDetailsForUser(user.id,true),bookings:db.prepare("SELECT * FROM bookings WHERE user_id=? ORDER BY start_at DESC").all(user.id),packages:db.prepare("SELECT * FROM booking_packages WHERE user_id=? ORDER BY created_at DESC").all(user.id),classes:db.prepare("SELECT e.*,c.title,c.start_date,c.end_date FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.user_id=?").all(user.id),resources,creditBalance:clientCreditBalance(user.id),creditHistory:db.prepare("SELECT * FROM client_credit_ledger WHERE user_id=? ORDER BY created_at DESC LIMIT 30").all(user.id),activity:db.prepare(`SELECT a.created_at,a.action,a.details,p.name pet_name,c.title class_title FROM activity_history a LEFT JOIN pets p ON p.id=a.pet_id LEFT JOIN classes c ON c.id=a.class_id WHERE a.user_id=? ORDER BY a.created_at DESC LIMIT 50`).all(user.id)});
+  const applicationDeposit=db.prepare("SELECT * FROM application_deposits WHERE user_id=?").get(user.id)||null;
+  res.json({record_type:'client',user,pets:petDetailsForUser(user.id,true),applicationDeposit,bookings:db.prepare("SELECT * FROM bookings WHERE user_id=? ORDER BY start_at DESC").all(user.id),packages:db.prepare("SELECT * FROM booking_packages WHERE user_id=? ORDER BY created_at DESC").all(user.id),classes:db.prepare("SELECT e.*,c.title,c.start_date,c.end_date FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.user_id=?").all(user.id),resources,creditBalance:clientCreditBalance(user.id),creditHistory:db.prepare("SELECT * FROM client_credit_ledger WHERE user_id=? ORDER BY created_at DESC LIMIT 30").all(user.id),activity:db.prepare(`SELECT a.created_at,a.action,a.details,p.name pet_name,c.title class_title FROM activity_history a LEFT JOIN pets p ON p.id=a.pet_id LEFT JOIN classes c ON c.id=a.class_id WHERE a.user_id=? ORDER BY a.created_at DESC LIMIT 50`).all(user.id)});
 });
 app.put("/api/trainer/pets/:id/private-notes",requireTrainer,(req,res)=>{
   const pet=db.prepare("SELECT id,user_id,name FROM pets WHERE id=?").get(req.params.id);
@@ -2644,11 +2768,13 @@ app.get("/api/trainer/reports/:type",requireTrainer,(req,res)=>{
              d.amount amount,
              COALESCE(d.manual_payment_code,'') mpesa_ref,
              CASE
+               WHEN d.decision_status='rejected' AND COALESCE(d.refund_amount,0)>0 THEN 'refunded'
+               WHEN d.decision_status='approved' THEN 'verified'
                WHEN d.manual_payment_status='verified' THEN 'verified'
                WHEN d.manual_payment_status='submitted' THEN 'unverified'
                ELSE d.manual_payment_status
              END status,
-             '' refund_credit,
+             CASE WHEN COALESCE(d.refund_amount,0)>0 THEN 'KES '||d.refund_amount||' / '||CASE WHEN d.refund_method='mpesa' THEN COALESCE(NULLIF(d.refund_reference,''),'M-Pesa') ELSE 'Cash' END WHEN d.decision_status='approved' THEN 'KES 700 / Credit' ELSE '' END refund_credit,
              'New client deposit' source,
              '' dog,
              ('APPLICATION-'||d.id) booking_ref
@@ -2660,6 +2786,7 @@ app.get("/api/trainer/reports/:type",requireTrainer,(req,res)=>{
   else if(type==='clients'){title='Clients';rows=db.prepare(`SELECT u.id,u.name,u.email,COALESCE(u.whatsapp_phone,u.phone) whatsapp,COALESCE(u.mpesa_phone,u.phone) mpesa,u.kra_pin,u.newsletter_opt_in,u.created_at,u.last_login_at,u.status_override,GROUP_CONCAT(CASE WHEN p.archived=0 THEN p.name END, ', ') dogs FROM users u LEFT JOIN pets p ON p.user_id=u.id WHERE u.role='client' GROUP BY u.id ORDER BY u.name`).all().map(u=>({...u,status:calculatedClientStatus(u)}))}
   else if(type==='vaccinations'){title='Vaccinations';rows=db.prepare(`SELECT u.name client,p.name dog,p.vaccination_status,p.vaccination_verified_at,(SELECT COUNT(*) FROM pet_files f WHERE f.pet_id=p.id AND f.kind='vaccination') files FROM pets p JOIN users u ON u.id=p.user_id WHERE p.archived=0 ORDER BY u.name,p.name`).all()}
   else if(type==='newsletter'){title='The Canine Grapevine';rows=db.prepare(`SELECT name,email,COALESCE(whatsapp_phone,phone) whatsapp,last_login_at FROM users WHERE role='client' AND newsletter_opt_in=1 ORDER BY name`).all()}
+  else if(type==='rejected_archive'){title='Rejected Client Archive';rows=db.prepare(`SELECT id,name,email,whatsapp_phone whatsapp,rejected_at,deleted_at,snapshot_json FROM rejected_client_archive WHERE substr(deleted_at,1,10) BETWEEN ? AND ? ORDER BY deleted_at DESC`).all(from,to).map(r=>{let snap={};try{snap=JSON.parse(r.snapshot_json||'{}')}catch{}const u=snap.user||{},d=snap.applicationDeposit||{},pets=Array.isArray(snap.pets)?snap.pets:[];return {deleted_at:r.deleted_at,name:r.name,email:r.email,whatsapp:r.whatsapp,area:u.location||'',training_needs:u.client_intro_note||'',dogs:pets.map(p=>p.name).filter(Boolean).join(', '),payment:d.amount?`KES ${d.amount}${d.manual_payment_code?` · ${d.manual_payment_code}`:''}`:'',refund:d.refund_amount?`KES ${d.refund_amount} / ${d.refund_method==='mpesa'?(d.refund_reference||'M-Pesa'):'Cash'}`:'',rejected_at:r.rejected_at}})}
   else return res.status(404).json({error:'Unknown report.'}); res.json({title,type,from,to,generatedAt:new Date().toISOString(),rows});
 });
 

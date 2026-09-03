@@ -1,19 +1,18 @@
-The Custom Made Canine v22.0.6 — BATCH 2.1
+The Custom Made Canine v22.0.7 — BATCH 3A
 
-Focused follow-up to the successful v22.0.5 application/payment flow.
+New Client management and application recovery.
 
 Included:
-- Payments Report now includes New Client Application deposits as soon as Amy has not yet verified them.
-  Submitted deposits display status "unverified"; verified deposits display "verified".
-- Client Portal dog vaccination field now uses the same full requirements text as signup, hidden behind a small information (i) button.
-- No acknowledgement checkbox is used in the Client Portal.
-- Client Portal vaccination upload now permits PDF as well as JPEG/PNG/WebP, matching signup.
-- Training Resources "Back to Dashboard" is explicitly left aligned.
+- Server-side incomplete application drafts saved after identity/contact step, with continuation from another device using the same email + WhatsApp number.
+- Amy Clients operational filters: All, Unverified, Incomplete, Current, Rejected.
+- Unverified client details include application information and application-payment state.
+- Existing submitted-application / outstanding-payment login-and-finish-payment flow preserved.
+- Approve action verifies the KES 1,000 application deposit, makes the client Current, and adds KES 700 account credit.
+- Refund & Reject records the KES 700 refundable portion (Cash or 10-character M-Pesa reference) and keeps the client restricted.
+- Incomplete applications can be deleted so the applicant can restart cleanly.
+- Rejected clients can be deleted from the active system; a historical Rejected Client Archive report remains and the email can be reused for a future fresh application.
+- Payments Report continues to include unverified application payments and now shows application credit/refund outcomes compactly.
+- Password inputs are explicitly hardened against Android/browser auto-capitalisation, autocorrect and spell checking.
+- Existing Batch 2.1 Training Resources back-arrow fix is preserved, not reimplemented.
 
-Intentionally NOT included yet:
-- Google Maps location/pin field
-- expanded Amy New Client review/profile
-- printable selectable/date-range Client Report builder
-- public homepage Batch 3/4 changes
-
-No database reset required.
+Database changes are additive/idempotent. No database reset required.

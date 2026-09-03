@@ -1,4 +1,4 @@
-v22.0.6 — BATCH 2.1
+v22.0.7 — BATCH 3A
 
 Replace:
 - server.js
@@ -10,14 +10,16 @@ Replace:
 - public/index.html
 
 Do NOT reset the database.
+All Batch 3A database changes are additive/idempotent and are created automatically at startup.
 
-Targeted smoke test:
-1. Amy > Reports > Payments: choose a range containing the two recent applications.
-2. Confirm each submitted-but-unverified KES 1,000 deposit appears as:
-   Source = New client deposit
-   Status = unverified
-   M-Pesa Ref = submitted reference
-3. Verify one deposit in Needs Attention and regenerate the report; status should read verified.
-4. Client Portal > Dogs: click the small (i) beside Vaccination record and confirm the full signup requirements appear.
-5. Confirm vaccination upload accepts a PDF.
-6. Amy > Training Resources: confirm Back to Dashboard is left aligned.
+Primary smoke test:
+1. Start a New Client Application, complete Step 1 and continue, then close the browser before submitting.
+2. Amy > Clients > Incomplete: confirm the applicant is visible.
+3. On another device/browser, start Sign up using the exact same name, email and WhatsApp number; confirm saved data is restored and the application continues rather than showing email already registered.
+4. Finish Submit & Pay but do not submit an M-Pesa reference. Log out/in and confirm Complete application payment is still available.
+5. Submit a 10-character application M-Pesa reference. Amy > Clients > Unverified: open client and confirm the payment shows Unverified.
+6. Amy > Reports > Payments: confirm the KES 1,000 New client deposit is present before verification.
+7. Approve payment + KES 700 credit. Confirm client moves to Current, can book, and account credit is KES 700.
+8. Repeat with another applicant and choose Refund & Reject. Confirm Rejected filter and payment/refund record.
+9. Delete the rejected client. Confirm they disappear from active Clients and appear in Reports > Rejected Client Archive; confirm the email can start a fresh application.
+10. Android: reset a password such as "gmail 12" and sign in. Confirm no automatic capitalisation/autocorrect changes the password.
