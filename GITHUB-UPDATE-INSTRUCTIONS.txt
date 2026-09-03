@@ -1,5 +1,23 @@
-v22.0.6 — BATCH 3
-Replace server.js, package.json, VERSION.txt, GITHUB-UPDATE-INSTRUCTIONS.txt, public/app.js, public/styles.css, public/index.html.
+v22.0.6 — BATCH 2.1
+
+Replace:
+- server.js
+- package.json
+- VERSION.txt
+- GITHUB-UPDATE-INSTRUCTIONS.txt
+- public/app.js
+- public/styles.css
+- public/index.html
+
 Do NOT reset the database.
 
-Test Amy > Clients, Payments Report UNVERIFIED/Verified application deposits, applicant approval, Area/Google Maps field, client vaccination ⓘ and PDF chooser, Training Resources back alignment, and Client report date ranges/checkbox printing.
+Targeted smoke test:
+1. Amy > Reports > Payments: choose a range containing the two recent applications.
+2. Confirm each submitted-but-unverified KES 1,000 deposit appears as:
+   Source = New client deposit
+   Status = unverified
+   M-Pesa Ref = submitted reference
+3. Verify one deposit in Needs Attention and regenerate the report; status should read verified.
+4. Client Portal > Dogs: click the small (i) beside Vaccination record and confirm the full signup requirements appear.
+5. Confirm vaccination upload accepts a PDF.
+6. Amy > Training Resources: confirm Back to Dashboard is left aligned.

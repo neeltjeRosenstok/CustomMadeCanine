@@ -1,13 +1,19 @@
-The Custom Made Canine v22.0.6 — BATCH 3 CLIENT RECORDS & REPORTS
+The Custom Made Canine v22.0.6 — BATCH 2.1
 
-- New Client Applications separated from approved clients with meaningful stages.
-- Amy can see full application/household/dog/deposit details.
-- Submitted application deposits appear in Payments Report as UNVERIFIED; verified ones as Verified.
-- Explicit approval after deposit verification.
-- Location renamed Area; Google Maps pin/current-location field added and stored.
-- Client Portal vaccination wording matches signup behind a small info control, without acknowledgement; PDF accepted.
-- Training Resources Back to Dashboard aligned left.
-- Printable client report builder with date range presets/custom dates and selectable header/client/household/individual dogs/history/training notes/payments/resources.
-- Resource shares carry date stamps.
+Focused follow-up to the successful v22.0.5 application/payment flow.
+
+Included:
+- Payments Report now includes New Client Application deposits as soon as Amy has not yet verified them.
+  Submitted deposits display status "unverified"; verified deposits display "verified".
+- Client Portal dog vaccination field now uses the same full requirements text as signup, hidden behind a small information (i) button.
+- No acknowledgement checkbox is used in the Client Portal.
+- Client Portal vaccination upload now permits PDF as well as JPEG/PNG/WebP, matching signup.
+- Training Resources "Back to Dashboard" is explicitly left aligned.
+
+Intentionally NOT included yet:
+- Google Maps location/pin field
+- expanded Amy New Client review/profile
+- printable selectable/date-range Client Report builder
+- public homepage Batch 3/4 changes
 
 No database reset required.

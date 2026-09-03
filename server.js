@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "22.0.6-batch3-client-records-reports";
+const APP_VERSION = "22.0.6-batch2.1";
 const STK_PUSH_ENABLED = process.env.STK_PUSH_ENABLED === "true"; // dormant future option; manual PayBill is the live payment flow
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
@@ -385,17 +385,6 @@ function clientCreditBalance(userId){
  const r=db.prepare("SELECT COALESCE(SUM(amount_delta),0) balance FROM client_credit_ledger WHERE user_id=?").get(userId);
  return Number(r?.balance||0);
 }
-function applicationStageForUser(userId,rawClientStatus){
- if(String(rawClientStatus||"current")==="current")return "Approved";
- const petCount=Number(db.prepare("SELECT COUNT(*) n FROM pets WHERE user_id=?").get(userId)?.n||0);
- const dep=db.prepare("SELECT manual_payment_status FROM application_deposits WHERE user_id=?").get(userId);
- if(!petCount&&!dep)return "Application started — incomplete";
- if(!dep)return "Application submitted — awaiting payment";
- if(dep.manual_payment_status==="submitted")return "Payment submitted — awaiting verification";
- if(dep.manual_payment_status==="verified")return "Under review";
- if(dep.manual_payment_status==="rejected")return "Payment rejected — action required";
- return "Application in progress";
-}
 function packageSessionRefundableAmount(booking){
  if(!booking?.package_id)return Math.max(0,Number(booking?.price||0));
  const pkg=db.prepare("SELECT package_price FROM booking_packages WHERE id=?").get(booking.package_id);
@@ -521,7 +510,6 @@ try { db.exec("ALTER TABLE reviews ADD COLUMN starred INTEGER NOT NULL DEFAULT 0
 try { db.exec("ALTER TABLE reviews ADD COLUMN retired INTEGER NOT NULL DEFAULT 0"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN client_status TEXT NOT NULL DEFAULT 'current'"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN location TEXT"); } catch {}
-try { db.exec("ALTER TABLE users ADD COLUMN google_maps_location TEXT"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN client_intro_note TEXT"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN household_dogs INTEGER"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN household_adults INTEGER"); } catch {}
@@ -559,8 +547,6 @@ try { db.exec("ALTER TABLE pets ADD COLUMN vaccination_verified_by INTEGER REFER
 try { db.exec("ALTER TABLE reviews ADD COLUMN photo_filename TEXT"); } catch {}
 try { db.exec("ALTER TABLE reviews ADD COLUMN photo_consent INTEGER NOT NULL DEFAULT 0"); } catch {}
 try { db.exec("ALTER TABLE resource_access ADD COLUMN note TEXT"); } catch {}
-try { db.exec("ALTER TABLE resource_access ADD COLUMN shared_at TEXT"); } catch {}
-try { db.exec("UPDATE resource_access SET shared_at=(SELECT created_at FROM resources WHERE resources.id=resource_access.resource_id) WHERE shared_at IS NULL"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN whatsapp_phone TEXT"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN mpesa_phone TEXT"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN newsletter_opt_in INTEGER NOT NULL DEFAULT 0"); } catch {}
@@ -880,7 +866,7 @@ async function initiateMpesa(phone,amount,accountRef) {
 
 // Auth
 app.post("/api/auth/register", (req,res)=>{
- const {name,email,whatsappPhone,mpesaPhone,password,newsletterOptIn,applicationSignup,location,googleMapsLocation,introNote,householdDogs,householdAdults,children0to8,children9to13,children14plus,householdChanges,householdNote}=req.body;
+ const {name,email,whatsappPhone,mpesaPhone,password,newsletterOptIn,applicationSignup,location,introNote,householdDogs,householdAdults,children0to8,children9to13,children14plus,householdChanges,householdNote}=req.body;
  const whatsRaw=String(whatsappPhone||"").trim(),mpesaRaw=String(mpesaPhone||"").trim(),cleanEmail=String(email||"").trim().toLowerCase();
  if(!name||!cleanEmail||!whatsRaw||!password)return res.status(400).json({error:"Please complete name, WhatsApp number, email and password."});
  if(!validWhatsappPhone(whatsRaw))return res.status(400).json({error:"WhatsApp number may contain numbers, spaces and a leading + only."});
@@ -895,9 +881,9 @@ app.post("/api/auth/register", (req,res)=>{
  let id=null;
  try{
   const hash=bcrypt.hashSync(password,12);
-  id=db.prepare(`INSERT INTO users(role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,last_login_at,password_hash,client_status,location,google_maps_location,client_intro_note,household_dogs,household_adults,children_0_8,children_9_13,children_14_plus,household_changes,household_note)
-   VALUES('client',?,?,?,?,?,?,CURRENT_TIMESTAMP,?,?,?,?,?,?,?,?,?,?,?,?)`)
-   .run(String(name).trim(),cleanEmail,whats,whats,mpesa,newsletterOptIn?1:0,hash,applicationSignup?"applicant":"current",String(location||"").trim(),String(googleMapsLocation||"").trim(),String(introNote||"").trim(),householdDogs===""||householdDogs==null?null:Number(householdDogs),householdAdults===""||householdAdults==null?null:String(householdAdults).trim(),children0to8===""||children0to8==null?null:Number(children0to8),children9to13===""||children9to13==null?null:Number(children9to13),children14plus===""||children14plus==null?null:Number(children14plus),String(householdChanges||"").trim(),String(householdNote||"").trim()).lastInsertRowid;
+  id=db.prepare(`INSERT INTO users(role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,last_login_at,password_hash,client_status,location,client_intro_note,household_dogs,household_adults,children_0_8,children_9_13,children_14_plus,household_changes,household_note)
+   VALUES('client',?,?,?,?,?,?,CURRENT_TIMESTAMP,?,?,?,?,?,?,?,?,?,?,?)`)
+   .run(String(name).trim(),cleanEmail,whats,whats,mpesa,newsletterOptIn?1:0,hash,applicationSignup?"applicant":"current",String(location||"").trim(),String(introNote||"").trim(),householdDogs===""||householdDogs==null?null:Number(householdDogs),householdAdults===""||householdAdults==null?null:String(householdAdults).trim(),children0to8===""||children0to8==null?null:Number(children0to8),children9to13===""||children9to13==null?null:Number(children9to13),children14plus===""||children14plus==null?null:Number(children14plus),String(householdChanges||"").trim(),String(householdNote||"").trim()).lastInsertRowid;
  }catch(e){
   const nowExists=db.prepare("SELECT id FROM users WHERE email=?").get(cleanEmail);
   if(nowExists)return res.status(409).json({error:"An account with this email has just been created. Please try signing in.",code:"EMAIL_JUST_CREATED"});
@@ -1483,18 +1469,18 @@ function petDetailsForUser(userId,includeTrainer=false) {
 }
 
 app.get("/api/my/profile",requireAuth,(req,res)=>{
-  const user=db.prepare("SELECT id,role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,location,google_maps_location,last_login_at FROM users WHERE id=?").get(req.user.id);
+  const user=db.prepare("SELECT id,role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,last_login_at FROM users WHERE id=?").get(req.user.id);
   const applicationDeposit=db.prepare("SELECT amount,manual_payment_code,manual_payment_status,submitted_at,verified_at FROM application_deposits WHERE user_id=?").get(req.user.id)||null;
   res.json({user,pets:petDetailsForUser(req.user.id),creditBalance:clientCreditBalance(req.user.id),creditHistory:db.prepare("SELECT * FROM client_credit_ledger WHERE user_id=? ORDER BY created_at DESC LIMIT 20").all(req.user.id),applicationDeposit});
 });
 app.put("/api/my/profile",requireAuth,(req,res)=>{
   const before=db.prepare("SELECT * FROM users WHERE id=?").get(req.user.id);
-  const name=String(req.body.name||before.name).trim(), whats=String(req.body.whatsappPhone??before.whatsapp_phone??before.phone??"").trim(), mpesa=String(req.body.mpesaPhone??before.mpesa_phone??whats).trim()||whats, kra=String(req.body.kraPin??before.kra_pin??"").trim()||null, area=String(req.body.location??before.location??"").trim(), maps=String(req.body.googleMapsLocation??before.google_maps_location??"").trim();
+  const name=String(req.body.name||before.name).trim(), whats=String(req.body.whatsappPhone??before.whatsapp_phone??before.phone??"").trim(), mpesa=String(req.body.mpesaPhone??before.mpesa_phone??whats).trim()||whats, kra=String(req.body.kraPin??before.kra_pin??"").trim()||null;
   const newsletter=req.body.newsletterOptIn===true||req.body.newsletterOptIn===1||String(req.body.newsletterOptIn)==='true'?1:0;
-  db.prepare("UPDATE users SET name=?,phone=?,whatsapp_phone=?,mpesa_phone=?,newsletter_opt_in=?,kra_pin=?,location=?,google_maps_location=? WHERE id=?").run(name,whats,whats,mpesa,newsletter,kra,area,maps,req.user.id);
-  const changes=[]; if(before.name!==name)changes.push('name'); if((before.whatsapp_phone||before.phone||'')!==whats)changes.push('WhatsApp number'); if((before.mpesa_phone||before.phone||'')!==mpesa)changes.push('M-Pesa number'); if(Number(before.newsletter_opt_in||0)!==newsletter)changes.push('newsletter preference'); if((before.kra_pin||'')!==(kra||''))changes.push('billing/KRA details'); if((before.location||'')!==area)changes.push('area'); if((before.google_maps_location||'')!==maps)changes.push('Google Maps location');
+  db.prepare("UPDATE users SET name=?,phone=?,whatsapp_phone=?,mpesa_phone=?,newsletter_opt_in=?,kra_pin=? WHERE id=?").run(name,whats,whats,mpesa,newsletter,kra,req.user.id);
+  const changes=[]; if(before.name!==name)changes.push('name'); if((before.whatsapp_phone||before.phone||'')!==whats)changes.push('WhatsApp number'); if((before.mpesa_phone||before.phone||'')!==mpesa)changes.push('M-Pesa number'); if(Number(before.newsletter_opt_in||0)!==newsletter)changes.push('newsletter preference'); if((before.kra_pin||'')!==(kra||''))changes.push('billing/KRA details');
   if(changes.length)logActivity({userId:req.user.id,actorUserId:req.user.id,actorRole:'client',action:'account_edited',details:`Client updated ${changes.join(', ')}.`});
-  res.json({user:db.prepare("SELECT id,role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,location,google_maps_location,last_login_at FROM users WHERE id=?").get(req.user.id)});
+  res.json({user:db.prepare("SELECT id,role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,last_login_at FROM users WHERE id=?").get(req.user.id)});
 });
 app.post("/api/my/application-deposit/manual-payment",requireAuth,(req,res)=>{
  if(String(req.user.client_status||"current")==="current")return res.status(409).json({error:"This account is already approved."});
@@ -2286,7 +2272,7 @@ app.put("/api/trainer/resources/:id",requireTrainer,(req,res)=>{
  res.json(db.prepare("SELECT * FROM resources WHERE id=?").get(r.id));
 });
 app.delete("/api/trainer/resources/:id",requireTrainer,(req,res)=>{db.prepare("UPDATE resources SET archived=1 WHERE id=?").run(req.params.id);res.json({ok:true})});
-app.post("/api/trainer/resources/:id/access",requireTrainer,(req,res)=>{const {userId,note}=req.body;if(!userId)return res.status(400).json({error:"Choose a client."});db.prepare("INSERT INTO resource_access(resource_id,user_id,pet_id,class_id,note,shared_at) VALUES(?,?,NULL,NULL,?,CURRENT_TIMESTAMP)").run(req.params.id,userId,note||null);const r=db.prepare("SELECT title FROM resources WHERE id=?").get(req.params.id);logActivity({userId:Number(userId),actorUserId:req.user.id,actorRole:'trainer',action:'resource_assigned',details:`Amy shared resource: ${r?.title||'Training resource'}.`});res.json({ok:true})});
+app.post("/api/trainer/resources/:id/access",requireTrainer,(req,res)=>{const {userId,note}=req.body;if(!userId)return res.status(400).json({error:"Choose a client."});db.prepare("INSERT INTO resource_access(resource_id,user_id,pet_id,class_id,note) VALUES(?,?,NULL,NULL,?)").run(req.params.id,userId,note||null);const r=db.prepare("SELECT title FROM resources WHERE id=?").get(req.params.id);logActivity({userId:Number(userId),actorUserId:req.user.id,actorRole:'trainer',action:'resource_assigned',details:`Amy shared resource: ${r?.title||'Training resource'}.`});res.json({ok:true})});
 app.post("/api/trainer/resources/:id/class-access",requireTrainer,(req,res)=>{
  const classId=Number(req.body.classId),note=String(req.body.note||"").trim();
  const r=db.prepare("SELECT id,title FROM resources WHERE id=? AND archived=0").get(req.params.id);
@@ -2294,8 +2280,8 @@ app.post("/api/trainer/resources/:id/class-access",requireTrainer,(req,res)=>{
  if(!r)return res.status(404).json({error:"Resource not found."});
  if(!course)return res.status(404).json({error:"Class not found."});
  const existing=db.prepare("SELECT id FROM resource_access WHERE resource_id=? AND class_id=? LIMIT 1").get(r.id,course.id);
- if(existing)db.prepare("UPDATE resource_access SET note=?,shared_at=CURRENT_TIMESTAMP WHERE id=?").run(note||null,existing.id);
- else db.prepare("INSERT INTO resource_access(resource_id,user_id,pet_id,class_id,note,shared_at) VALUES(?,NULL,NULL,?,?,CURRENT_TIMESTAMP)").run(r.id,course.id,note||null);
+ if(existing)db.prepare("UPDATE resource_access SET note=? WHERE id=?").run(note||null,existing.id);
+ else db.prepare("INSERT INTO resource_access(resource_id,user_id,pet_id,class_id,note) VALUES(?,NULL,NULL,?,?)").run(r.id,course.id,note||null);
  const participants=db.prepare("SELECT COUNT(DISTINCT user_id) n FROM class_enrolments WHERE class_id=? AND enrolment_status='active' AND payment_status IN ('paid','demo_paid','credit_paid')").get(course.id)?.n||0;
  logActivity({classId:course.id,actorUserId:req.user.id,actorRole:"trainer",action:"resource_shared_with_class",details:`Resource shared with class ${course.title}: ${r.title}.`});
  res.json({ok:true,participants:Number(participants)});
@@ -2472,37 +2458,23 @@ app.post("/api/trainer/reviews/:id/status",requireTrainer,(req,res)=>{
 });
 app.get("/api/trainer/clients",requireTrainer,(req,res)=>{
   expireTimedHolds();
-  const users=db.prepare("SELECT id,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,location,google_maps_location,created_at,last_login_at,status_override,COALESCE(client_status,'current') raw_client_status FROM users WHERE role='client' ORDER BY name").all();
+  const users=db.prepare("SELECT id,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,created_at,last_login_at,status_override,COALESCE(client_status,'current') client_status FROM users WHERE role='client' ORDER BY name").all();
   const petRows=db.prepare(`SELECT p.id,p.user_id,p.name,p.gender,p.date_of_birth,p.archived,(SELECT COUNT(*) FROM bookings b WHERE b.pet_id=p.id AND b.status!='cancelled') private_count,(SELECT COUNT(*) FROM class_enrolments e WHERE e.pet_id=p.id AND e.enrolment_status='active') class_count FROM pets p ORDER BY p.archived,p.name`).all();
-  res.json(users.map(u=>{const approved=u.raw_client_status==="current";return {...u,client_status:approved?calculatedClientStatus({...u,client_status:u.raw_client_status}):"applicant",application_stage:applicationStageForUser(u.id,u.raw_client_status),pets:petRows.filter(p=>p.user_id===u.id)}}));
+  res.json(users.map(u=>({...u,client_status:calculatedClientStatus(u),pets:petRows.filter(p=>p.user_id===u.id)})));
 });
 app.get("/api/trainer/client/:id",requireTrainer,(req,res)=>{
-  const user=db.prepare("SELECT id,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,location,google_maps_location,client_intro_note,household_dogs,household_adults,children_0_8,children_9_13,children_14_plus,household_changes,household_note,created_at,last_login_at,status_override,COALESCE(client_status,'current') raw_client_status FROM users WHERE id=? AND role='client'").get(req.params.id);
-  if(!user)return res.status(404).json({error:"Client not found."});
-  user.client_status=user.raw_client_status==="current"?calculatedClientStatus({...user,client_status:user.raw_client_status}):"applicant";
-  user.application_stage=applicationStageForUser(user.id,user.raw_client_status);
-  const resources=db.prepare(`SELECT DISTINCT r.id,r.title,r.type,r.category,
-      COALESCE((SELECT a2.note FROM resource_access a2 WHERE a2.resource_id=r.id AND a2.user_id=? ORDER BY a2.id DESC LIMIT 1),(SELECT a3.note FROM resource_access a3 WHERE a3.resource_id=r.id AND a3.class_id IN (SELECT class_id FROM class_enrolments WHERE user_id=? AND enrolment_status='active' AND payment_status IN ('paid','demo_paid','credit_paid')) ORDER BY a3.id DESC LIMIT 1)) note,
-      COALESCE((SELECT a2.shared_at FROM resource_access a2 WHERE a2.resource_id=r.id AND a2.user_id=? ORDER BY a2.id DESC LIMIT 1),r.created_at) shared_at
+  const user=db.prepare("SELECT id,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,created_at,last_login_at,status_override,COALESCE(client_status,'current') client_status FROM users WHERE id=? AND role='client'").get(req.params.id);
+  if(!user)return res.status(404).json({error:"Client not found."}); user.client_status=calculatedClientStatus(user);
+  const resources=db.prepare(`
+    SELECT DISTINCT r.id,r.title,r.type,r.category,
+      COALESCE((SELECT a2.note FROM resource_access a2 WHERE a2.resource_id=r.id AND a2.user_id=? ORDER BY a2.id DESC LIMIT 1),
+               (SELECT a3.note FROM resource_access a3 WHERE a3.resource_id=r.id AND a3.class_id IN (SELECT class_id FROM class_enrolments WHERE user_id=? AND enrolment_status='active' AND payment_status IN ('paid','demo_paid','credit_paid')) ORDER BY a3.id DESC LIMIT 1)) note
     FROM resources r JOIN resource_access a ON a.resource_id=r.id
     WHERE r.archived=0 AND (a.user_id=? OR a.class_id IN (SELECT class_id FROM class_enrolments WHERE user_id=? AND enrolment_status='active' AND payment_status IN ('paid','demo_paid','credit_paid')))
-    ORDER BY COALESCE(r.category,'General'),r.type,r.title`).all(user.id,user.id,user.id,user.id,user.id);
-  const applicationDeposit=db.prepare("SELECT id,amount,manual_payment_code,manual_payment_status,submitted_at,verified_at FROM application_deposits WHERE user_id=?").get(user.id)||null;
-  const trainingNotes=db.prepare("SELECT n.*,p.name pet_name FROM training_notes n LEFT JOIN pets p ON p.id=n.pet_id WHERE n.user_id=? ORDER BY n.created_at ASC").all(user.id);
-  const paymentRows=[];
-  for(const x of db.prepare("SELECT COALESCE(payment_received_at,created_at) date,booking_ref reference,COALESCE(manual_payment_code,mpesa_receipt_number,'') confirmation_code,payment_status status,CASE WHEN manual_payment_status='verified' AND manual_payment_amount IS NOT NULL THEN manual_payment_amount ELSE MAX(COALESCE(price,0)-COALESCE(credit_applied,0),0) END amount,'Private' source FROM bookings WHERE user_id=? AND package_id IS NULL ORDER BY date").all(user.id))paymentRows.push(x);
-  for(const x of db.prepare("SELECT COALESCE(payment_received_at,created_at) date,('PACKAGE-'||id) reference,COALESCE(manual_payment_code,mpesa_receipt_number,'') confirmation_code,payment_status status,CASE WHEN manual_payment_status='verified' AND manual_payment_amount IS NOT NULL THEN manual_payment_amount ELSE MAX(COALESCE(package_price,0)-COALESCE(credit_applied,0),0) END amount,'Package' source FROM booking_packages WHERE user_id=? ORDER BY date").all(user.id))paymentRows.push(x);
-  for(const x of db.prepare("SELECT COALESCE(e.payment_received_at,e.created_at) date,e.booking_ref reference,COALESCE(e.manual_payment_code,e.mpesa_receipt_number,'') confirmation_code,e.payment_status status,CASE WHEN e.manual_payment_status='verified' AND e.manual_payment_amount IS NOT NULL THEN e.manual_payment_amount ELSE MAX(COALESCE(c.price,0)-COALESCE(e.credit_applied,0),0) END amount,'Class' source FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.user_id=? ORDER BY date").all(user.id))paymentRows.push(x);
-  if(applicationDeposit)paymentRows.push({date:applicationDeposit.verified_at||applicationDeposit.submitted_at,reference:"APPLICATION",confirmation_code:applicationDeposit.manual_payment_code||"",status:applicationDeposit.manual_payment_status==="submitted"?"unverified":applicationDeposit.manual_payment_status,amount:applicationDeposit.amount,source:"Application deposit"});
-  paymentRows.sort((x,y)=>String(x.date||"").localeCompare(String(y.date||"")));
-  res.json({user,pets:petDetailsForUser(user.id,true),bookings:db.prepare("SELECT * FROM bookings WHERE user_id=? ORDER BY start_at DESC").all(user.id),packages:db.prepare("SELECT * FROM booking_packages WHERE user_id=? ORDER BY created_at DESC").all(user.id),classes:db.prepare("SELECT e.*,c.title,c.start_date,c.end_date FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.user_id=?").all(user.id),resources,applicationDeposit,trainingNotes,payments:paymentRows,creditBalance:clientCreditBalance(user.id),creditHistory:db.prepare("SELECT * FROM client_credit_ledger WHERE user_id=? ORDER BY created_at DESC LIMIT 30").all(user.id),activity:db.prepare(`SELECT a.created_at,a.action,a.details,p.name pet_name,c.title class_title FROM activity_history a LEFT JOIN pets p ON p.id=a.pet_id LEFT JOIN classes c ON c.id=a.class_id WHERE a.user_id=? ORDER BY a.created_at DESC LIMIT 250`).all(user.id)});
+    ORDER BY COALESCE(r.category,'General'),r.type,r.title
+  `).all(user.id,user.id,user.id,user.id);
+  res.json({user,pets:petDetailsForUser(user.id,true),bookings:db.prepare("SELECT * FROM bookings WHERE user_id=? ORDER BY start_at DESC").all(user.id),packages:db.prepare("SELECT * FROM booking_packages WHERE user_id=? ORDER BY created_at DESC").all(user.id),classes:db.prepare("SELECT e.*,c.title,c.start_date,c.end_date FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.user_id=?").all(user.id),resources,creditBalance:clientCreditBalance(user.id),creditHistory:db.prepare("SELECT * FROM client_credit_ledger WHERE user_id=? ORDER BY created_at DESC LIMIT 30").all(user.id),activity:db.prepare(`SELECT a.created_at,a.action,a.details,p.name pet_name,c.title class_title FROM activity_history a LEFT JOIN pets p ON p.id=a.pet_id LEFT JOIN classes c ON c.id=a.class_id WHERE a.user_id=? ORDER BY a.created_at DESC LIMIT 50`).all(user.id)});
 });
-app.post("/api/trainer/clients/:id/approve",requireTrainer,(req,res)=>{
- const u=db.prepare("SELECT id,name,COALESCE(client_status,'current') client_status FROM users WHERE id=? AND role='client'").get(req.params.id);if(!u)return res.status(404).json({error:"Client not found."});
- const dep=db.prepare("SELECT manual_payment_status FROM application_deposits WHERE user_id=?").get(u.id);if(u.client_status!=="current"&&dep?.manual_payment_status!=="verified")return res.status(409).json({error:"Verify the application deposit before approving this client."});
- db.prepare("UPDATE users SET client_status='current',status_override=NULL WHERE id=?").run(u.id);logActivity({userId:u.id,actorUserId:req.user.id,actorRole:'trainer',action:'client_application_approved',details:'Amy approved the New Client Application.'});res.json({ok:true});
-});
-
 app.put("/api/trainer/pets/:id/private-notes",requireTrainer,(req,res)=>{
   const pet=db.prepare("SELECT id,user_id,name FROM pets WHERE id=?").get(req.params.id);
   if(!pet)return res.status(404).json({error:"Dog not found."});
@@ -2666,8 +2638,24 @@ app.get("/api/trainer/reports/:type",requireTrainer,(req,res)=>{
       FROM class_enrolments e JOIN users u ON u.id=e.user_id LEFT JOIN pets p ON p.id=e.pet_id JOIN classes c ON c.id=e.class_id
       WHERE e.payment_status NOT IN ('pending','cancelled','failed')
         AND substr(COALESCE(e.payment_received_at,e.created_at),1,10) BETWEEN ? AND ?`).all(from,to);
-    const applicationRows=db.prepare(`SELECT COALESCE(d.verified_at,d.submitted_at) received_at,u.name client,d.amount amount,COALESCE(d.manual_payment_code,'') mpesa_ref,CASE WHEN d.manual_payment_status='submitted' THEN 'unverified' ELSE d.manual_payment_status END status,'' refund_credit,'Application deposit' source,'' dog,'APPLICATION' booking_ref FROM application_deposits d JOIN users u ON u.id=d.user_id WHERE d.manual_payment_status IN ('submitted','verified') AND substr(COALESCE(d.verified_at,d.submitted_at),1,10) BETWEEN ? AND ?`).all(from,to);
-    rows=[...privateRows,...packageRows,...classRows,...applicationRows].sort((x,y)=>String(x.received_at).localeCompare(String(y.received_at)));
+    const applicationDepositRows=db.prepare(`
+      SELECT COALESCE(d.submitted_at,d.verified_at,d.created_at) received_at,
+             u.name client,
+             d.amount amount,
+             COALESCE(d.manual_payment_code,'') mpesa_ref,
+             CASE
+               WHEN d.manual_payment_status='verified' THEN 'verified'
+               WHEN d.manual_payment_status='submitted' THEN 'unverified'
+               ELSE d.manual_payment_status
+             END status,
+             '' refund_credit,
+             'New client deposit' source,
+             '' dog,
+             ('APPLICATION-'||d.id) booking_ref
+      FROM application_deposits d JOIN users u ON u.id=d.user_id
+      WHERE d.manual_payment_status IN ('submitted','verified')
+        AND substr(COALESCE(d.submitted_at,d.verified_at,d.created_at),1,10) BETWEEN ? AND ?`).all(from,to);
+    rows=[...privateRows,...packageRows,...classRows,...applicationDepositRows].sort((x,y)=>String(x.received_at).localeCompare(String(y.received_at)));
   }
   else if(type==='clients'){title='Clients';rows=db.prepare(`SELECT u.id,u.name,u.email,COALESCE(u.whatsapp_phone,u.phone) whatsapp,COALESCE(u.mpesa_phone,u.phone) mpesa,u.kra_pin,u.newsletter_opt_in,u.created_at,u.last_login_at,u.status_override,GROUP_CONCAT(CASE WHEN p.archived=0 THEN p.name END, ', ') dogs FROM users u LEFT JOIN pets p ON p.user_id=u.id WHERE u.role='client' GROUP BY u.id ORDER BY u.name`).all().map(u=>({...u,status:calculatedClientStatus(u)}))}
   else if(type==='vaccinations'){title='Vaccinations';rows=db.prepare(`SELECT u.name client,p.name dog,p.vaccination_status,p.vaccination_verified_at,(SELECT COUNT(*) FROM pet_files f WHERE f.pet_id=p.id AND f.kind='vaccination') files FROM pets p JOIN users u ON u.id=p.user_id WHERE p.archived=0 ORDER BY u.name,p.name`).all()}
