@@ -11,7 +11,7 @@ const multer = require("multer");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const APP_VERSION = "22.0.4-batch1-application-reliability";
+const APP_VERSION = "22.0.5-batch2-client-application-payment";
 const STK_PUSH_ENABLED = process.env.STK_PUSH_ENABLED === "true"; // dormant future option; manual PayBill is the live payment flow
 const SESSION_COOKIE = "cmc_session_online_test_2180";
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
@@ -410,6 +410,24 @@ function validNewPassword(value){
 }
 const PASSWORD_RULE="Please use 8 characters, including at least one letter and one number. Symbols and spaces are permitted.";
 
+function validWhatsappPhone(value){
+ const raw=String(value||"").trim();
+ if(!/^\+?[0-9 ]+$/.test(raw))return false;
+ const digits=raw.replace(/\D/g,"");
+ return digits.length>=6&&digits.length<=18;
+}
+function normalizeKenyanMpesaPhone(value){
+ const raw=String(value||"").trim();
+ if(!raw)return "";
+ if(!/^\+?[0-9 ]+$/.test(raw))return null;
+ const compact=raw.replace(/\s+/g,"");
+ let m=compact.match(/^0([17]\d{2})(\d{6})$/);
+ if(m)return `0${m[1]} ${m[2]}`;
+ m=compact.match(/^\+254([17]\d{2})(\d{6})$/);
+ if(m)return `+254 ${m[1]} ${m[2]}`;
+ return null;
+}
+
 function normalizeMpesaReference(value){
  return String(value||"").replace(/\s+/g,"").toUpperCase();
 }
@@ -619,6 +637,17 @@ CREATE TABLE IF NOT EXISTS trainer_notifications (
 CREATE INDEX IF NOT EXISTS idx_reschedule_hold ON reschedule_requests(status,hold_expires_at);
 CREATE INDEX IF NOT EXISTS idx_notifications_open ON trainer_notifications(resolved,created_at);
 `);
+
+db.exec(`CREATE TABLE IF NOT EXISTS application_deposits (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+ amount INTEGER NOT NULL DEFAULT 1000,
+ manual_payment_code TEXT,
+ manual_payment_status TEXT,
+ submitted_at TEXT,
+ verified_at TEXT,
+ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);`);
 try { db.exec("UPDATE pets SET vaccination_status='pending' WHERE vaccination_status='not_provided' AND id IN (SELECT pet_id FROM pet_files WHERE kind='vaccination')"); } catch {}
 
 
@@ -838,9 +867,14 @@ async function initiateMpesa(phone,amount,accountRef) {
 // Auth
 app.post("/api/auth/register", (req,res)=>{
  const {name,email,whatsappPhone,mpesaPhone,password,newsletterOptIn,applicationSignup,location,introNote,householdDogs,householdAdults,children0to8,children9to13,children14plus,householdChanges,householdNote}=req.body;
- const whats=String(whatsappPhone||"").trim(),mpesa=String(mpesaPhone||"").trim()||whats,cleanEmail=String(email||"").trim().toLowerCase();
- if(!name||!cleanEmail||!whats||!password)return res.status(400).json({error:"Please complete name, WhatsApp number, email and password."});
- if(applicationSignup&&/park\s*lands/i.test(String(location||"")))return res.status(409).json({error:"Sorry Amy does not work in this area, please contact KSPCA Mombasa on WhatsApp using +254 733 800495",code:"PARKLANDS_UNAVAILABLE"});
+ const whatsRaw=String(whatsappPhone||"").trim(),mpesaRaw=String(mpesaPhone||"").trim(),cleanEmail=String(email||"").trim().toLowerCase();
+ if(!name||!cleanEmail||!whatsRaw||!password)return res.status(400).json({error:"Please complete name, WhatsApp number, email and password."});
+ if(!validWhatsappPhone(whatsRaw))return res.status(400).json({error:"WhatsApp number may contain numbers, spaces and a leading + only."});
+ const whats=normalizeKenyanMpesaPhone(whatsRaw)||whatsRaw;
+ const formattedMpesa=mpesaRaw?normalizeKenyanMpesaPhone(mpesaRaw):"";
+ if(mpesaRaw&&!formattedMpesa)return res.status(400).json({error:"Enter a Kenyan M-Pesa number such as 0722 123456 or +254 700 123456. Numbers beginning 01 or +254 1 are also accepted."});
+ const whatsappAsMpesa=normalizeKenyanMpesaPhone(whats),mpesa=formattedMpesa||whatsappAsMpesa||whats;
+ if(applicationSignup&&/park\s*lands/i.test(String(location||"")))return res.status(409).json({error:"Sorry, Amy does not work in this area. Please contact Shels Sharma on WhatsApp +254 733 800495",code:"PARKLANDS_UNAVAILABLE"});
  if(!validClientEmail(cleanEmail))return res.status(400).json({error:"Please enter a valid email address."});
  if(!validNewPassword(password))return res.status(400).json({error:PASSWORD_RULE});
  if(db.prepare("SELECT id FROM users WHERE email=?").get(cleanEmail))return res.status(409).json({error:"That email is already registered. Please sign in instead.",code:"EMAIL_EXISTS"});
@@ -1436,7 +1470,8 @@ function petDetailsForUser(userId,includeTrainer=false) {
 
 app.get("/api/my/profile",requireAuth,(req,res)=>{
   const user=db.prepare("SELECT id,role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,last_login_at FROM users WHERE id=?").get(req.user.id);
-  res.json({user,pets:petDetailsForUser(req.user.id),creditBalance:clientCreditBalance(req.user.id),creditHistory:db.prepare("SELECT * FROM client_credit_ledger WHERE user_id=? ORDER BY created_at DESC LIMIT 20").all(req.user.id)});
+  const applicationDeposit=db.prepare("SELECT amount,manual_payment_code,manual_payment_status,submitted_at,verified_at FROM application_deposits WHERE user_id=?").get(req.user.id)||null;
+  res.json({user,pets:petDetailsForUser(req.user.id),creditBalance:clientCreditBalance(req.user.id),creditHistory:db.prepare("SELECT * FROM client_credit_ledger WHERE user_id=? ORDER BY created_at DESC LIMIT 20").all(req.user.id),applicationDeposit});
 });
 app.put("/api/my/profile",requireAuth,(req,res)=>{
   const before=db.prepare("SELECT * FROM users WHERE id=?").get(req.user.id);
@@ -1447,6 +1482,36 @@ app.put("/api/my/profile",requireAuth,(req,res)=>{
   if(changes.length)logActivity({userId:req.user.id,actorUserId:req.user.id,actorRole:'client',action:'account_edited',details:`Client updated ${changes.join(', ')}.`});
   res.json({user:db.prepare("SELECT id,role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,last_login_at FROM users WHERE id=?").get(req.user.id)});
 });
+app.post("/api/my/application-deposit/manual-payment",requireAuth,(req,res)=>{
+ if(String(req.user.client_status||"current")==="current")return res.status(409).json({error:"This account is already approved."});
+ const code=normalizeMpesaReference(req.body.confirmationCode),amount=Number(req.body.amount);
+ if(!/^[A-Z0-9]{10}$/.test(code))return res.status(400).json({error:"Enter the full 10-character M-Pesa confirmation reference."});
+ if(amount!==1000)return res.status(400).json({error:"The New Client Application deposit is KES 1,000."});
+ const existing=db.prepare("SELECT * FROM application_deposits WHERE user_id=?").get(req.user.id);
+ if(existing?.manual_payment_status==='verified')return res.status(409).json({error:"Your application deposit has already been verified."});
+ if(existing?.manual_payment_status==='submitted')return res.status(409).json({error:"Your application deposit reference has already been submitted to Amy."});
+ db.prepare(`INSERT INTO application_deposits(user_id,amount,manual_payment_code,manual_payment_status,submitted_at) VALUES(?,1000,?,'submitted',CURRENT_TIMESTAMP)
+             ON CONFLICT(user_id) DO UPDATE SET amount=1000,manual_payment_code=excluded.manual_payment_code,manual_payment_status='submitted',submitted_at=CURRENT_TIMESTAMP`).run(req.user.id,code);
+ logActivity({userId:req.user.id,actorUserId:req.user.id,actorRole:'client',action:'application_deposit_submitted',details:`New Client Application deposit submitted — KES 1,000 · M-Pesa ${code}.`});
+ notifyTrainer({userId:req.user.id,kind:'application_deposit',message:`New Client Application deposit submitted — KES 1,000 · M-Pesa ${code}.`});
+ res.json({ok:true,amount:1000,mpesaRef:code,status:'submitted'});
+});
+
+app.post("/api/trainer/application-deposits/:id/verify",requireTrainer,(req,res)=>{
+ const row=db.prepare("SELECT d.*,u.name client_name FROM application_deposits d JOIN users u ON u.id=d.user_id WHERE d.id=?").get(req.params.id);
+ if(!row||row.manual_payment_status!=='submitted')return res.status(404).json({error:"Application deposit submission not found."});
+ const approve=!!req.body.approve;
+ if(approve){
+  db.prepare("UPDATE application_deposits SET manual_payment_status='verified',verified_at=CURRENT_TIMESTAMP WHERE id=?").run(row.id);
+  logActivity({userId:row.user_id,actorUserId:req.user.id,actorRole:'trainer',action:'application_deposit_verified',details:`Application deposit verified — KES 1,000 · M-Pesa ${row.manual_payment_code}.`});
+ }else{
+  db.prepare("UPDATE application_deposits SET manual_payment_status='rejected',manual_payment_code=NULL,submitted_at=NULL WHERE id=?").run(row.id);
+  logActivity({userId:row.user_id,actorUserId:req.user.id,actorRole:'trainer',action:'application_deposit_rejected',details:'Application deposit reference rejected; client may resubmit.'});
+ }
+ db.prepare("UPDATE trainer_notifications SET resolved=1 WHERE kind='application_deposit' AND user_id=?").run(row.user_id);
+ res.json({ok:true});
+});
+
 app.post("/api/my/pets",requireAuth,imageUpload.fields([
   {name:"dogPhoto",maxCount:1},
   {name:"vaccinationPages",maxCount:6}
@@ -1694,6 +1759,7 @@ app.get("/api/trainer/summary",requireTrainer,(req,res)=>{
     rescheduleAttention:db.prepare(`SELECT rr.*,b.booking_ref,b.service,b.location_type,u.name client_name,p.name pet_name FROM reschedule_requests rr JOIN bookings b ON b.id=rr.booking_id JOIN users u ON u.id=rr.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE rr.status='pending' AND datetime(rr.hold_expires_at)>datetime('now') ORDER BY rr.created_at`).all(),
     manualPaymentAttention:db.prepare(`SELECT b.id,b.booking_ref,COALESCE(NULLIF(b.price,0),bp.package_price,0) price,b.manual_payment_code,b.manual_payment_amount,u.name client_name,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id LEFT JOIN booking_packages bp ON bp.id=b.package_id WHERE b.manual_payment_status='submitted' ORDER BY b.created_at`).all(),
     classManualPaymentAttention:(()=>{try{return db.prepare(`SELECT e.id,e.booking_ref,c.title,c.price,e.manual_payment_code,e.manual_payment_amount,u.name client_name,p.name pet_name FROM class_enrolments e JOIN classes c ON c.id=e.class_id JOIN users u ON u.id=e.user_id LEFT JOIN pets p ON p.id=e.pet_id WHERE e.manual_payment_status='submitted' ORDER BY e.id`).all()}catch(err){console.error("Class manual-payment attention query failed:",err.message);return []}})(),
+    applicationDepositAttention:db.prepare(`SELECT d.id,d.user_id,d.amount,d.manual_payment_code,d.submitted_at,u.name client_name FROM application_deposits d JOIN users u ON u.id=d.user_id WHERE d.manual_payment_status='submitted' ORDER BY d.submitted_at`).all(),
     notifications:db.prepare("SELECT n.*,u.name client_name,p.name pet_name FROM trainer_notifications n LEFT JOIN users u ON u.id=n.user_id LEFT JOIN pets p ON p.id=n.pet_id WHERE n.resolved=0 ORDER BY n.created_at DESC LIMIT 30").all(),
     blocks:db.prepare("SELECT * FROM availability_blocks ORDER BY start_at DESC LIMIT 20").all(),resources:db.prepare("SELECT * FROM resources ORDER BY created_at DESC").all(),clientCount:db.prepare("SELECT COUNT(*) n FROM users WHERE role='client'").get().n
   });

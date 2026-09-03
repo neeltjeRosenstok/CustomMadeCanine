@@ -1,20 +1,30 @@
-v22.0.4 — BATCH 1 APPLICATION RELIABILITY
+v22.0.5 — BATCH 2 CLIENT APPLICATION POLISH + DEPOSIT PAYMENT
 
-Replace:
+Replace these files in GitHub:
 - server.js
 - package.json
 - VERSION.txt
 - GITHUB-UPDATE-INSTRUCTIONS.txt
 - public/app.js
+- public/styles.css
 - public/index.html
 
 Do NOT reset the database.
+Do NOT replace or alter public/mpesa-paybill-qr.jpg; the existing exact QR asset is retained unchanged.
 
-Smoke test:
-1. Start a New Client Application with a new email and complete account creation.
-2. Confirm the application succeeds instead of showing "Your account could not be created".
-3. Confirm the first dog is created and the thank-you screen appears.
-4. Confirm applicant can enter Client Portal but cannot book private training or join a class.
-5. Log applicant out and back in; booking must still be locked.
-6. Test Location "Parklands", "Park Lands", "parklands", and "PARK LANDS"; each should show KSPCA Mombasa +254 733 800495.
-7. Log out, open Log in, and confirm Show password starts unchecked.
+Recommended test sequence:
+1. Start a fresh New Client Application.
+2. In WhatsApp, try letters/punctuation: they must not remain in the field.
+3. M-Pesa valid examples: 0722 123456, 0112 345678, +254 700 123456, +254 112 345678.
+4. M-Pesa invalid examples: +3489327hjsd, +31 6 12321234, 0722ABC456. They must not be accepted as an M-Pesa number.
+5. Leave M-Pesa blank: the application may continue.
+6. Enter Parklands and Park Lands: both must show Shels Sharma +254 733 800495 with Close / WhatsApp Shels.
+7. From Note for Amy press Tab: Continue to dog details should be prioritised; Back is not in normal Tab order.
+8. Use Back and return forward: previously entered form details should remain.
+9. Household has only Back and Continue; no Skip this section button.
+10. Complete Confirm & Secure and click Submit & Pay.
+11. Confirm the KES 1,000 M-Pesa PayBill screen shows the existing QR, PayBill 542542, Account 727777 and M-Pesa App wording.
+12. Submit a 10-character test reference. The Account set up screen should then appear.
+13. Open the restricted Client Portal > My Bookings and confirm the revised approval notice.
+14. As Amy, check Needs Attention for the application deposit and test Verify/Reject.
+15. Confirm the applicant remains unable to book until Amy separately approves the application.

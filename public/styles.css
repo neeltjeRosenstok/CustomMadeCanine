@@ -1609,3 +1609,21 @@ input[type="password"]{text-transform:none!important}
  .application-file-field{grid-template-columns:1fr}
  .selected-file-name{min-height:40px}
 }
+
+
+/* v22.0.5 Batch 2 — New Client Application safety + payment */
+.vaccination-signup-content{text-align:left}
+.application-phone-fields>div{display:grid;gap:4px}
+.field-warning{display:block;color:#8b1d1d;font-weight:600;line-height:1.25}
+.field-example{display:block;line-height:1.3}
+.application-nav.safe-nav{display:grid;grid-template-columns:minmax(110px,.7fr) minmax(190px,1fr);align-items:center;gap:12px}
+.application-nav.safe-nav .application-nav-back{justify-self:start;text-align:left;margin:0;padding:8px 0}
+.application-nav.safe-nav .primary{justify-self:end;min-width:190px}
+.application-payment{padding:18px;border:1px solid rgba(37,33,94,.15);border-radius:14px}
+.application-payment>h2{margin:.25rem 0 .8rem}
+.application-payment .paybill-payment-box{margin-top:14px}
+@media(max-width:520px){
+ .application-nav.safe-nav{display:grid;grid-template-columns:minmax(90px,.65fr) minmax(0,1.35fr);gap:10px}
+ .application-nav.safe-nav button{width:100%}
+ .application-nav.safe-nav .primary{min-width:0}
+}
