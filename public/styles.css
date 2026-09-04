@@ -1724,3 +1724,19 @@ input[type="password"]{text-transform:none!important}
 @media(max-width:680px){.client-filter-toolbar .client-status-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.client-filter-toolbar .client-status-filters button:last-of-type{grid-column:2}.private-note-entry{grid-template-columns:1fr}.client-record-modal{padding-top:52px!important}}
 .client-filter-toolbar .client-status-filters{grid-template-columns:minmax(130px,.7fr) minmax(240px,1.3fr)!important}.client-filter-toolbar .client-status-filters>.client-inline-search{grid-column:auto!important}.client-filter-toolbar .client-status-filters button{width:100%}
 @media(max-width:680px){.client-filter-toolbar .client-status-filters{grid-template-columns:1fr 1fr!important}.client-filter-toolbar .client-status-filters>.client-inline-search{grid-column:auto!important;min-width:0}.client-filter-toolbar .client-status-filters button:last-of-type{grid-column:auto!important}}
+
+/* v22.1.0a Batch 3B hotfix — modal flow, compact client cards and message stability */
+body.modal-open{overflow:hidden!important;touch-action:none}
+.client-record-modal{overscroll-behavior:contain;max-height:90dvh!important}
+.client-record-modal .client-record-title{display:block!important;min-width:0!important}
+.client-record-modal .client-record-title h2{margin-bottom:.3rem}
+.client-record-modal .compact-client-contact p{margin:.08rem 0!important;line-height:1.12!important}
+.client-record-top{grid-template-columns:minmax(0,1fr) minmax(220px,300px)!important;align-items:start!important}
+.client-payment-status-box{position:static!important;width:auto!important;max-width:100%!important}
+.client-filter-toolbar .client-status-filters{display:flex!important;flex-wrap:wrap!important;gap:7px!important;align-items:center!important}
+.client-filter-toolbar .client-status-filters button{width:auto!important;flex:0 0 auto!important;min-width:112px}
+.client-filter-toolbar .client-inline-search{width:min(300px,100%)!important;flex:0 1 300px!important}
+.client-record-folds>details,.trainer-dog-record{contain:layout paint;overflow:visible!important}
+.trainer-dog-record .compact-list{max-height:none!important;overflow:visible!important;display:grid!important;gap:6px}
+.trainer-dog-record .package-session-row{position:static!important;display:flex!important;flex-wrap:wrap!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;min-width:0}
+@media(max-width:980px){.client-record-top{grid-template-columns:1fr!important}.client-filter-toolbar .client-inline-search{flex-basis:100%!important;width:100%!important}}
