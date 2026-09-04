@@ -1459,9 +1459,18 @@ input[type="password"]{text-transform:none!important}
 
 /* v22.0.1 New Client Application */
 .application-shell{width:min(980px,100%);margin:0 auto}
-.application-progress{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 18px}
-.application-progress span{padding:9px 10px;border:1px solid rgba(37,33,94,.15);border-radius:9px;text-align:center;font-size:.84rem}
-.application-progress span.active{font-weight:700;border-color:#25215e}
+.application-progress{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin:0 0 20px;position:relative}
+.application-progress-step{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;min-width:0;font-size:.8rem;font-weight:600}
+.application-progress-step::before,.application-progress-step::after{content:"";position:absolute;top:16px;height:3px;background:rgba(37,33,94,.16);width:50%;z-index:0}
+.application-progress-step::before{right:50%}.application-progress-step::after{left:50%}
+.application-progress-step:first-child::before,.application-progress-step:last-child::after{display:none}
+.application-progress-step.complete::before,.application-progress-step.complete::after,.application-progress-step.current::before{background:#25215e}
+.application-progress-dot{position:relative;z-index:1;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;border:2px solid rgba(37,33,94,.28);background:#fff;color:#25215e;font-weight:800}
+.application-progress-step.current .application-progress-dot,.application-progress-step.complete .application-progress-dot{background:#25215e;color:#fff;border-color:#25215e}
+.application-progress-label{line-height:1.15;color:#444}
+.application-progress-step.current .application-progress-label{color:#25215e;font-weight:800}
+.application-vaccination-reminder{margin-top:.8rem!important}
+.application-duration{margin-top:.8rem!important;margin-bottom:0!important}
 .application-deposit-copy{padding:16px 18px;border:1px solid rgba(37,33,94,.18);border-radius:14px;margin-bottom:18px}
 .application-deposit-copy h3{margin-top:0}
 .application-deposit-copy p,.application-deposit-copy ul{margin:.5rem 0}
@@ -1488,14 +1497,12 @@ input[type="password"]{text-transform:none!important}
 .application-summary span,.application-summary strong{display:block}
 .application-status-banner{margin-bottom:14px}
 @media(max-width:800px){
- .application-progress{grid-template-columns:1fr 1fr}
  .aligned-form .form-row{grid-template-columns:1fr;gap:5px;align-items:start}
  .aligned-form .textarea-row>label:first-child{padding-top:0}
  .paired-fields{grid-template-columns:1fr}
  .paired-fields.three{grid-template-columns:repeat(3,1fr)}
 }
 @media(max-width:520px){
- .application-progress{grid-template-columns:1fr}
  .paired-fields.three{grid-template-columns:1fr}
  .application-summary{grid-template-columns:1fr}
  .application-nav,.application-nav.three-actions{display:grid;grid-template-columns:1fr}
@@ -1690,3 +1697,9 @@ input[type="password"]{text-transform:none!important}
 .vaccination-pdf .pdf-file-card{min-height:120px;border:1px solid rgba(37,33,94,.16);border-radius:10px;padding:14px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:12px;background:rgba(255,255,255,.65)}
 .rejection-client-banner{line-height:1.45}.rejected-archive-cards{display:flex;flex-direction:column;gap:14px}.rejected-archive-card{border:1px solid rgba(37,33,94,.16);border-radius:14px;padding:16px;background:#fff}.archive-card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border-bottom:1px solid rgba(37,33,94,.12);padding-bottom:10px;margin-bottom:12px}.archive-card-head h3,.archive-card-head p{margin:.1rem 0}.archive-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.archive-card-grid>div{display:flex;flex-direction:column;gap:3px}.archive-card-grid strong{font-weight:900}.archive-card-grid .archive-wide{grid-column:1/-1}
 @media(max-width:760px){.client-overview-head{grid-template-columns:minmax(0,1fr) 94px 18px}.client-record-top,.application-review-grid,.google-location-controls,.archive-card-grid{grid-template-columns:1fr}.client-payment-status-box .client-status-badge{align-self:flex-start}.archive-card-grid .archive-wide{grid-column:auto}}
+
+@media(max-width:520px){
+ .application-progress-step{font-size:.68rem;gap:4px}
+ .application-progress-dot{width:30px;height:30px}
+ .application-progress-step::before,.application-progress-step::after{top:14px}
+}

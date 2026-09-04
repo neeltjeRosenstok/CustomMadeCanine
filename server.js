@@ -920,6 +920,10 @@ function applicationDraftPublic(row){
  if(!row)return null;
  return {id:row.id,email:row.email,name:row.name,firstName:row.first_name||"",lastName:row.last_name||"",whatsappPhone:row.whatsapp_phone,mpesaPhone:row.mpesa_phone||"",newsletterOptIn:!!row.newsletter_opt_in,location:row.location||"",googleMapsLocation:row.google_maps_location||"",introNote:row.intro_note||"",dogName:row.dog_name||"",dogBreed:row.dog_breed||"",dogGender:row.dog_gender||"",dogDob:row.dog_dob||"",householdDogs:row.household_dogs??"",householdAdults:row.household_adults??"",children0to8:row.children_0_8??"",children9to13:row.children_9_13??"",children14plus:row.children_14_plus??"",householdChanges:row.household_changes||"",householdNote:row.household_note||"",lastStep:Number(row.last_step||1)};
 }
+try { db.exec("ALTER TABLE application_drafts ADD COLUMN first_name TEXT"); } catch {}
+try { db.exec("ALTER TABLE application_drafts ADD COLUMN last_name TEXT"); } catch {}
+try { db.exec("ALTER TABLE application_drafts ADD COLUMN google_maps_location TEXT"); } catch {}
+
 app.post("/api/application-drafts/save",(req,res)=>{
  const b=req.body||{},cleanEmail=String(b.email||"").trim().toLowerCase(),firstName=String(b.firstName||"").trim(),lastName=String(b.lastName||"").trim(),name=String(b.name||[firstName,lastName].filter(Boolean).join(" ")).trim(),whatsRaw=String(b.whatsappPhone||"").trim();
  if(!firstName||!lastName||!cleanEmail||!whatsRaw)return res.status(400).json({error:"Please complete your first name, last name, email and WhatsApp number first."});
