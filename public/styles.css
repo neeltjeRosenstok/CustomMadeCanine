@@ -1706,7 +1706,7 @@ input[type="password"]{text-transform:none!important}
 
 
 /* Batch 3A.2 */
-.header-login-btn{margin-left:auto;border:1px solid var(--navy);background:transparent;color:var(--navy);border-radius:999px;padding:9px 15px;font-weight:900;white-space:nowrap;cursor:pointer}
+.header-login-btn{margin-left:auto;border:1px solid var(--cream);background:transparent;color:var(--cream);border-radius:999px;padding:9px 15px;font-weight:900;white-space:nowrap;cursor:pointer}
 .account-menu{right:18px;left:auto;min-width:200px}
 .portal-menu-four{grid-template-columns:repeat(4,minmax(0,1fr))!important}
 .client-messages{display:grid;gap:12px}.client-message-entry{display:grid;gap:6px}.client-message-meta{font-size:.88rem;color:var(--navy);line-height:1.35}.client-message-card{background:var(--white);border:1px solid var(--line);border-radius:14px;padding:14px;white-space:pre-wrap;line-height:1.5}
