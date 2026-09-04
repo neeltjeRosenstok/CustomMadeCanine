@@ -775,7 +775,7 @@ app.use(express.static(path.join(__dirname,"public")));
 
 function currentUser(req) {
   if (!req.session?.userId || req.session.appVersion !== APP_VERSION) return null;
-  return db.prepare("SELECT id,role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,last_login_at,COALESCE(client_status,\'current\') client_status FROM users WHERE id=?").get(req.session.userId) || null;
+  return db.prepare("SELECT id,role,name,first_name,last_name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,last_login_at,rejection_note,rejected_at,COALESCE(client_status,\'current\') client_status FROM users WHERE id=?").get(req.session.userId) || null;
 }
 function requireAuth(req,res,next) {
   const u=currentUser(req);
@@ -1346,6 +1346,8 @@ app.post("/api/bookings/:ref/demo-pay",requireAuth,(req,res)=>{
   if(!String(req.params.ref).startsWith("PRV-")) return res.status(400).json({error:"Demo payment unavailable."});
   const r=db.prepare("UPDATE bookings SET payment_status='demo_paid',status='confirmed',payment_received_at=CURRENT_TIMESTAMP WHERE booking_ref=? AND user_id=? AND payment_status='pending'").run(req.params.ref,req.user.id);
   if(!r.changes) return res.status(404).json({error:"Booking not found."});
+  const b=db.prepare("SELECT id,user_id,pet_id,booking_ref FROM bookings WHERE booking_ref=? AND user_id=?").get(req.params.ref,req.user.id);
+  if(b)notifyTrainer({userId:b.user_id,petId:b.pet_id,bookingId:b.id,kind:'new_booking',message:`Confirmed booking ${b.booking_ref}.`});
   res.json({ok:true});
 });
 
@@ -1418,7 +1420,7 @@ app.post("/api/my/class-enrolments/:id/cancel",requireAuth,(req,res)=>{
  logActivity({userId:req.user.id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"client",action:"class_cancel_requested",details:`${e.pet_name||"Dog"} cancelled from ${e.title}.${note?` Note: ${note}`:""}${paid?" Refund decision required.":""}`});
  res.json({ok:true,refundPending:paid});
 });
-app.get("/api/my/training-notes",requireAuth,(req,res)=>res.json(db.prepare("SELECT n.*,p.name pet_name FROM training_notes n LEFT JOIN pets p ON p.id=n.pet_id WHERE n.user_id=? AND n.client_visible=1 ORDER BY n.created_at DESC").all(req.user.id)));
+app.get("/api/my/training-notes",requireAuth,(req,res)=>res.json(db.prepare(`SELECT n.*,p.name pet_name,b.service booking_service,b.start_at booking_start_at,b.booking_ref FROM training_notes n LEFT JOIN pets p ON p.id=n.pet_id LEFT JOIN bookings b ON b.id=n.booking_id WHERE n.user_id=? AND n.client_visible=1 ORDER BY datetime(n.created_at) DESC,n.id DESC`).all(req.user.id)));
 
 app.post("/api/classes/:id/enrol",requireAuth,requireApprovedClient,(req,res)=>{
   expireTimedHolds();
@@ -1889,10 +1891,11 @@ app.get("/api/trainer/summary",requireTrainer,(req,res)=>{
     cancellationAttention:db.prepare(`SELECT b.id,b.user_id,b.pet_id,b.booking_ref,b.start_at,b.end_at,b.service,b.location_type,b.address,b.payment_status,b.status,b.price,b.package_id,b.refund_amount,b.refund_confirmation_code,b.credit_amount,u.name client_name,u.email client_email,COALESCE(u.whatsapp_phone,u.phone) client_phone,p.name pet_name,bp.name package_name,bp.package_price FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id LEFT JOIN booking_packages bp ON bp.id=b.package_id WHERE b.payment_status='refund_pending' ORDER BY b.start_at DESC`).all().map(b=>({...b,refundable_amount:packageSessionRefundableAmount(b)})),
     classRefundAttention:db.prepare(`SELECT e.id,e.class_id,e.booking_ref,e.payment_status,e.enrolment_status,e.rejected_reason,c.title,c.price,u.name client_name,p.name pet_name FROM class_enrolments e JOIN classes c ON c.id=e.class_id JOIN users u ON u.id=e.user_id LEFT JOIN pets p ON p.id=e.pet_id WHERE e.payment_status='refund_pending' AND e.enrolment_status!='active' ORDER BY e.rejected_at DESC,e.id DESC`).all(),
     rescheduleAttention:db.prepare(`SELECT rr.*,b.booking_ref,b.service,b.location_type,u.name client_name,p.name pet_name FROM reschedule_requests rr JOIN bookings b ON b.id=rr.booking_id JOIN users u ON u.id=rr.user_id LEFT JOIN pets p ON p.id=b.pet_id WHERE rr.status='pending' AND datetime(rr.hold_expires_at)>datetime('now') ORDER BY rr.created_at`).all(),
-    manualPaymentAttention:db.prepare(`SELECT b.id,b.booking_ref,COALESCE(NULLIF(b.price,0),bp.package_price,0) price,b.manual_payment_code,b.manual_payment_amount,u.name client_name,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id LEFT JOIN booking_packages bp ON bp.id=b.package_id WHERE b.manual_payment_status='submitted' ORDER BY b.created_at`).all(),
-    classManualPaymentAttention:(()=>{try{return db.prepare(`SELECT e.id,e.booking_ref,c.title,c.price,e.credit_applied,e.manual_payment_code,e.manual_payment_amount,u.name client_name,p.name pet_name FROM class_enrolments e JOIN classes c ON c.id=e.class_id JOIN users u ON u.id=e.user_id LEFT JOIN pets p ON p.id=e.pet_id WHERE e.manual_payment_status='submitted' ORDER BY e.id`).all()}catch(err){console.error("Class manual-payment attention query failed:",err.message);return []}})(),
+    manualPaymentAttention:db.prepare(`SELECT b.id,b.booking_ref,b.credit_applied,b.hold_expires_at,COALESCE(NULLIF(b.price,0),bp.package_price,0) price,b.manual_payment_code,b.manual_payment_amount,u.name client_name,p.name pet_name FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id LEFT JOIN booking_packages bp ON bp.id=b.package_id WHERE b.manual_payment_status='submitted' ORDER BY b.created_at`).all(),
+    classManualPaymentAttention:(()=>{try{return db.prepare(`SELECT e.id,e.booking_ref,c.title,c.price,e.credit_applied,e.hold_expires_at,e.manual_payment_code,e.manual_payment_amount,u.name client_name,p.name pet_name FROM class_enrolments e JOIN classes c ON c.id=e.class_id JOIN users u ON u.id=e.user_id LEFT JOIN pets p ON p.id=e.pet_id WHERE e.manual_payment_status='submitted' ORDER BY e.id`).all()}catch(err){console.error("Class manual-payment attention query failed:",err.message);return []}})(),
     applicationDepositAttention:db.prepare(`SELECT d.id,d.user_id,d.amount,d.manual_payment_code,d.submitted_at,u.name client_name FROM application_deposits d JOIN users u ON u.id=d.user_id WHERE d.manual_payment_status='submitted' ORDER BY d.submitted_at`).all(),
     notifications:db.prepare("SELECT n.*,u.name client_name,p.name pet_name FROM trainer_notifications n LEFT JOIN users u ON u.id=n.user_id LEFT JOIN pets p ON p.id=n.pet_id WHERE n.resolved=0 AND n.kind!='new_account' ORDER BY n.created_at DESC LIMIT 30").all(),
+    newBookingAttention:db.prepare(`SELECT n.id notification_id,n.booking_id,b.booking_ref,b.start_at,u.name client_name,p.name pet_name FROM trainer_notifications n JOIN bookings b ON b.id=n.booking_id LEFT JOIN users u ON u.id=n.user_id LEFT JOIN pets p ON p.id=n.pet_id WHERE n.resolved=0 AND n.kind='new_booking' ORDER BY b.start_at,n.created_at`).all(),
     blocks:db.prepare("SELECT * FROM availability_blocks ORDER BY start_at DESC LIMIT 20").all(),resources:db.prepare("SELECT * FROM resources ORDER BY created_at DESC").all(),clientCount:db.prepare("SELECT COUNT(*) n FROM users WHERE role='client'").get().n
   });
 });
@@ -2650,6 +2653,8 @@ app.post("/api/my/payments/apply-credit",requireAuth,(req,res)=>{
    }
  });
  tx();
+ if(newRemaining===0&&target.type==='private')notifyTrainer({userId:req.user.id,petId:target.row.pet_id||null,bookingId:target.row.id,kind:'new_booking',message:`Confirmed booking ${target.row.booking_ref}.`});
+ if(newRemaining===0&&target.type==='package'){const first=db.prepare("SELECT id,pet_id,booking_ref FROM bookings WHERE package_id=? ORDER BY start_at,id LIMIT 1").get(target.row.id);if(first)notifyTrainer({userId:req.user.id,petId:first.pet_id||null,bookingId:first.id,kind:'new_booking',message:`Confirmed training package ${target.row.name||target.row.id}.`});}
  const balance=clientCreditBalance(req.user.id);
  logActivity({userId:req.user.id,petId:target.row.pet_id||null,actorUserId:req.user.id,actorRole:"client",action:"client_credit_used",details:`KES ${applied} client credit applied to ${target.type} payment. Remaining credit KES ${balance}.`});
  res.json({ok:true,applied,remaining:newRemaining,creditBalance:balance,settled:newRemaining===0});
@@ -2701,6 +2706,7 @@ app.post("/api/trainer/bookings/:id/manual-payment",requireTrainer,(req,res)=>{
  const approve=!!req.body.approve;
  if(approve){
   db.prepare("UPDATE bookings SET payment_status='paid',status='confirmed',manual_payment_status='verified',hold_expires_at=NULL,payment_received_at=CURRENT_TIMESTAMP,mpesa_receipt_number=? WHERE id=?").run(b.manual_payment_code,b.id);
+  notifyTrainer({userId:b.user_id,petId:b.pet_id,bookingId:b.id,kind:'new_booking',message:`Confirmed booking ${b.booking_ref}.`});
   if(b.package_id){
    const pkg=db.prepare("SELECT * FROM booking_packages WHERE id=?").get(b.package_id);
    db.prepare("UPDATE booking_packages SET payment_status='paid',status='confirmed',manual_payment_status='verified',hold_expires_at=NULL,payment_received_at=CURRENT_TIMESTAMP,mpesa_receipt_number=? WHERE id=?").run(pkg?.manual_payment_code||b.manual_payment_code,b.package_id);

@@ -1703,3 +1703,15 @@ input[type="password"]{text-transform:none!important}
  .application-progress-dot{width:30px;height:30px}
  .application-progress-step::before,.application-progress-step::after{top:14px}
 }
+
+
+/* Batch 3A.2 */
+.header-login-btn{margin-left:auto;border:1px solid var(--navy);background:transparent;color:var(--navy);border-radius:999px;padding:9px 15px;font-weight:900;white-space:nowrap;cursor:pointer}
+.account-menu{right:18px;left:auto;min-width:200px}
+.portal-menu-four{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.client-messages{display:grid;gap:12px}.client-message-entry{display:grid;gap:6px}.client-message-meta{font-size:.88rem;color:var(--navy);line-height:1.35}.client-message-card{background:var(--white);border:1px solid var(--line);border-radius:14px;padding:14px;white-space:pre-wrap;line-height:1.5}
+.client-record-title p{margin:.18rem 0;line-height:1.3}.client-record-top{position:relative}.client-payment-status-box{min-width:0}.client-activity-filters,.attention-filters{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:8px 0 12px}.attention-card{overflow:visible}
+.bookings-panel .list{overflow:visible!important;max-height:none!important}.bookings-panel details{position:static!important;overflow:visible!important}.bookings-panel details .compact-list{max-height:none!important;overflow:visible!important}.bookings-panel .card{height:auto!important;overflow:visible!important}
+.application-vaccination-reminder{display:block;margin-top:10px}
+@media(max-width:980px){.client-record-top{grid-template-columns:1fr!important}.client-payment-status-box .client-status-badge{align-self:flex-start}.portal-menu-four{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:520px){.brand-name{display:none}.header-login-btn{font-size:.84rem;padding:8px 11px}.attention-filters{display:grid;grid-template-columns:1fr 1fr}.attention-filters button{width:100%}}
