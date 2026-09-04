@@ -1,18 +1,1 @@
-The Custom Made Canine v22.0.7 — BATCH 3A
-
-New Client management and application recovery.
-
-Included:
-- Server-side incomplete application drafts saved after identity/contact step, with continuation from another device using the same email + WhatsApp number.
-- Amy Clients operational filters: All, Unverified, Incomplete, Current, Rejected.
-- Unverified client details include application information and application-payment state.
-- Existing submitted-application / outstanding-payment login-and-finish-payment flow preserved.
-- Approve action verifies the KES 1,000 application deposit, makes the client Current, and adds KES 700 account credit.
-- Refund & Reject records the KES 700 refundable portion (Cash or 10-character M-Pesa reference) and keeps the client restricted.
-- Incomplete applications can be deleted so the applicant can restart cleanly.
-- Rejected clients can be deleted from the active system; a historical Rejected Client Archive report remains and the email can be reused for a future fresh application.
-- Payments Report continues to include unverified application payments and now shows application credit/refund outcomes compactly.
-- Password inputs are explicitly hardened against Android/browser auto-capitalisation, autocorrect and spell checking.
-- Existing Batch 2.1 Training Resources back-arrow fix is preserved, not reimplemented.
-
-Database changes are additive/idempotent. No database reset required.
+v22.0.8 — Batch 3A.1

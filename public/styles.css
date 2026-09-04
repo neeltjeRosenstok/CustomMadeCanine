@@ -1676,3 +1676,17 @@ input[type="password"]{text-transform:none!important}
 .application-review-grid p{margin:.3rem 0 0;white-space:pre-wrap}
 .client-decision-actions{margin-top:16px;flex-wrap:wrap}
 @media(max-width:760px){.application-review-grid{grid-template-columns:1fr}.client-status-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.client-status-filters button{width:100%}}
+
+/* v22.0.8 Batch 3A.1 */
+.client-overview-head{display:grid!important;grid-template-columns:minmax(0,1fr) 100px 22px;align-items:center;gap:10px;width:100%;text-align:left}
+.client-status-badge{min-width:92px;box-sizing:border-box}
+.client-record-top{display:grid;grid-template-columns:minmax(0,2fr) minmax(220px,1fr);gap:14px;align-items:start;margin-bottom:14px}
+.client-payment-status-box{border:1px solid rgba(37,33,94,.16);border-radius:12px;padding:12px;background:rgba(255,255,255,.62);display:flex;flex-direction:column;gap:7px}
+.client-payment-status-box .client-status-badge{align-self:flex-end}
+.client-payment-status-box>strong,.application-box-heading{font-weight:900!important;color:var(--navy)}
+.application-review-grid{grid-template-columns:minmax(0,2fr) minmax(220px,1fr)}
+.household-detail-lines{display:flex;flex-direction:column;gap:7px;margin-top:7px}.household-detail-lines>div{display:flex;flex-direction:column;padding-bottom:6px;border-bottom:1px solid rgba(37,33,94,.1)}.household-detail-lines strong{font-weight:850}
+.google-location-controls{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.vaccination-pdf .pdf-file-card{min-height:120px;border:1px solid rgba(37,33,94,.16);border-radius:10px;padding:14px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:12px;background:rgba(255,255,255,.65)}
+.rejection-client-banner{line-height:1.45}.rejected-archive-cards{display:flex;flex-direction:column;gap:14px}.rejected-archive-card{border:1px solid rgba(37,33,94,.16);border-radius:14px;padding:16px;background:#fff}.archive-card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border-bottom:1px solid rgba(37,33,94,.12);padding-bottom:10px;margin-bottom:12px}.archive-card-head h3,.archive-card-head p{margin:.1rem 0}.archive-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.archive-card-grid>div{display:flex;flex-direction:column;gap:3px}.archive-card-grid strong{font-weight:900}.archive-card-grid .archive-wide{grid-column:1/-1}
+@media(max-width:760px){.client-overview-head{grid-template-columns:minmax(0,1fr) 94px 18px}.client-record-top,.application-review-grid,.google-location-controls,.archive-card-grid{grid-template-columns:1fr}.client-payment-status-box .client-status-badge{align-self:flex-start}.archive-card-grid .archive-wide{grid-column:auto}}
