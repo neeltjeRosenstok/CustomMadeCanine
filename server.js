@@ -206,7 +206,8 @@ CREATE TABLE IF NOT EXISTS resource_access (
   resource_id INTEGER NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   pet_id INTEGER REFERENCES pets(id) ON DELETE CASCADE,
-  class_id INTEGER REFERENCES classes(id) ON DELETE CASCADE
+  class_id INTEGER REFERENCES classes(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS training_notes (
@@ -216,6 +217,26 @@ CREATE TABLE IF NOT EXISTS training_notes (
   booking_id INTEGER REFERENCES bookings(id) ON DELETE SET NULL,
   note TEXT NOT NULL,
   client_visible INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS client_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reply_to_type TEXT,
+  reply_to_id INTEGER,
+  body TEXT NOT NULL,
+  sender_role TEXT NOT NULL DEFAULT 'client',
+  seen_by_trainer INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_client_messages_user ON client_messages(user_id,created_at);
+CREATE INDEX IF NOT EXISTS idx_client_messages_attention ON client_messages(seen_by_trainer,created_at);
+
+CREATE TABLE IF NOT EXISTS client_private_notes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  note TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -554,6 +575,8 @@ try { db.exec("ALTER TABLE pets ADD COLUMN vaccination_verified_by INTEGER REFER
 try { db.exec("ALTER TABLE reviews ADD COLUMN photo_filename TEXT"); } catch {}
 try { db.exec("ALTER TABLE reviews ADD COLUMN photo_consent INTEGER NOT NULL DEFAULT 0"); } catch {}
 try { db.exec("ALTER TABLE resource_access ADD COLUMN note TEXT"); } catch {}
+try { db.exec("ALTER TABLE resource_access ADD COLUMN created_at TEXT"); } catch {}
+try { db.exec("UPDATE resource_access SET created_at=CURRENT_TIMESTAMP WHERE created_at IS NULL"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN whatsapp_phone TEXT"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN mpesa_phone TEXT"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN newsletter_opt_in INTEGER NOT NULL DEFAULT 0"); } catch {}
@@ -1358,7 +1381,7 @@ app.get("/api/my/bookings",requireAuth,(req,res)=>{
     WHERE b.user_id=? ORDER BY b.start_at`).all(req.user.id).map(b=>({...b,first_appointment:isFirstAppointmentForDog(b.pet_id,b.id),refundable_amount:packageSessionRefundableAmount(b)}));
   const classBookings=db.prepare(`SELECT e.*,c.title,c.description,c.start_date,c.end_date,c.start_time,c.end_time,p.name AS pet_name
     FROM class_enrolments e JOIN classes c ON c.id=e.class_id LEFT JOIN pets p ON p.id=e.pet_id
-    WHERE e.user_id=? ORDER BY c.start_date`).all(req.user.id);
+    WHERE e.user_id=? ORDER BY c.start_date`).all(req.user.id).map(e=>({...e,sessions:db.prepare("SELECT session_date,start_time,end_time FROM class_sessions WHERE class_id=? ORDER BY session_date,start_time").all(e.class_id)}));
   const packages=db.prepare("SELECT bp.*,p.name pet_name,(SELECT COUNT(*) FROM bookings b WHERE b.package_id=bp.id) session_count FROM booking_packages bp LEFT JOIN pets p ON p.id=bp.pet_id WHERE bp.user_id=? ORDER BY bp.created_at DESC").all(req.user.id);
   const rescheduleRequests=db.prepare("SELECT rr.*,b.booking_ref FROM reschedule_requests rr JOIN bookings b ON b.id=rr.booking_id WHERE rr.user_id=? ORDER BY rr.created_at DESC").all(req.user.id);
   const privateUpdates=db.prepare(`
@@ -1420,7 +1443,13 @@ app.post("/api/my/class-enrolments/:id/cancel",requireAuth,(req,res)=>{
  logActivity({userId:req.user.id,petId:e.pet_id,classId:e.class_id,actorUserId:req.user.id,actorRole:"client",action:"class_cancel_requested",details:`${e.pet_name||"Dog"} cancelled from ${e.title}.${note?` Note: ${note}`:""}${paid?" Refund decision required.":""}`});
  res.json({ok:true,refundPending:paid});
 });
-app.get("/api/my/training-notes",requireAuth,(req,res)=>res.json(db.prepare(`SELECT n.*,p.name pet_name,b.service booking_service,b.start_at booking_start_at,b.booking_ref FROM training_notes n LEFT JOIN pets p ON p.id=n.pet_id LEFT JOIN bookings b ON b.id=n.booking_id WHERE n.user_id=? AND n.client_visible=1 ORDER BY datetime(n.created_at) DESC,n.id DESC`).all(req.user.id)));
+app.get("/api/my/training-notes",requireAuth,(req,res)=>{
+ const notes=db.prepare(`SELECT 'note' item_type,n.id,n.note,p.name pet_name,b.service booking_service,b.start_at booking_start_at,b.booking_ref,n.created_at,'Amy' sender FROM training_notes n LEFT JOIN pets p ON p.id=n.pet_id LEFT JOIN bookings b ON b.id=n.booking_id WHERE n.user_id=? AND n.client_visible=1`).all(req.user.id);
+ const resources=db.prepare(`SELECT 'resource' item_type,a.id,COALESCE(a.note,'') note,NULL pet_name,NULL booking_service,NULL booking_start_at,NULL booking_ref,a.created_at,'Amy' sender,r.title resource_title,r.type resource_type FROM resource_access a JOIN resources r ON r.id=a.resource_id WHERE a.user_id=?`).all(req.user.id);
+ const replies=db.prepare(`SELECT 'reply' item_type,id,body note,NULL pet_name,NULL booking_service,NULL booking_start_at,NULL booking_ref,created_at,CASE WHEN sender_role='client' THEN 'You' ELSE 'Amy' END sender,reply_to_type,reply_to_id FROM client_messages WHERE user_id=?`).all(req.user.id);
+ res.json([...notes,...resources,...replies].sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))));
+});
+app.post("/api/my/messages",requireAuth,(req,res)=>{const body=String(req.body.body||'').trim();if(!body)return res.status(400).json({error:'Please enter a message.'});const id=db.prepare("INSERT INTO client_messages(user_id,reply_to_type,reply_to_id,body,sender_role,seen_by_trainer) VALUES(?,?,?,?, 'client',0)").run(req.user.id,String(req.body.replyToType||''),Number(req.body.replyToId||0)||null,body).lastInsertRowid;notifyTrainer({userId:req.user.id,kind:'client_message',message:'Client sent a message.'});res.json({ok:true,id});});
 
 app.post("/api/classes/:id/enrol",requireAuth,requireApprovedClient,(req,res)=>{
   expireTimedHolds();
@@ -1535,8 +1564,8 @@ app.post("/api/my/classes/:ref/resume-payment",requireAuth,(req,res)=>{
 });
 
 app.post("/api/classes/:ref/demo-pay",requireAuth,(req,res)=>{
-  const r=db.prepare("UPDATE class_enrolments SET payment_status='demo_paid',payment_received_at=CURRENT_TIMESTAMP WHERE booking_ref=? AND user_id=? AND payment_status='pending' AND enrolment_status='active'").run(req.params.ref,req.user.id);
-  if(!r.changes) return res.status(404).json({error:"Enrolment not found."});
+  const e=db.prepare("SELECT * FROM class_enrolments WHERE booking_ref=? AND user_id=? AND payment_status='pending' AND enrolment_status='active'").get(req.params.ref,req.user.id);if(!e)return res.status(404).json({error:'Enrolment not found.'});
+  db.prepare("UPDATE class_enrolments SET payment_status='demo_paid',payment_received_at=CURRENT_TIMESTAMP WHERE id=?").run(e.id);notifyTrainer({userId:req.user.id,petId:e.pet_id||null,classId:e.class_id,kind:'new_class_booking',message:`Confirmed class booking ${e.booking_ref}.`});
   res.json({ok:true});
 });
 
@@ -1563,12 +1592,13 @@ app.get("/api/my/profile",requireAuth,(req,res)=>{
 });
 app.put("/api/my/profile",requireAuth,(req,res)=>{
   const before=db.prepare("SELECT * FROM users WHERE id=?").get(req.user.id);
-  const name=String(req.body.name||before.name).trim(), whats=String(req.body.whatsappPhone??before.whatsapp_phone??before.phone??"").trim(), mpesa=String(req.body.mpesaPhone??before.mpesa_phone??whats).trim()||whats, kra=String(req.body.kraPin??before.kra_pin??"").trim()||null;
+  const firstName=String(req.body.firstName??before.first_name??'').trim(),lastName=String(req.body.lastName??before.last_name??'').trim();
+  const name=String(req.body.name||[firstName,lastName].filter(Boolean).join(' ')||before.name).trim(), whats=String(req.body.whatsappPhone??before.whatsapp_phone??before.phone??"").trim(), mpesa=String(req.body.mpesaPhone??before.mpesa_phone??whats).trim()||whats, kra=String(req.body.kraPin??before.kra_pin??"").trim()||null,location=String(req.body.location??before.location??'').trim(),googleMapsLocation=String(req.body.googleMapsLocation??before.google_maps_location??'').trim();
   const newsletter=req.body.newsletterOptIn===true||req.body.newsletterOptIn===1||String(req.body.newsletterOptIn)==='true'?1:0;
-  db.prepare("UPDATE users SET name=?,phone=?,whatsapp_phone=?,mpesa_phone=?,newsletter_opt_in=?,kra_pin=? WHERE id=?").run(name,whats,whats,mpesa,newsletter,kra,req.user.id);
+  db.prepare("UPDATE users SET name=?,first_name=?,last_name=?,phone=?,whatsapp_phone=?,mpesa_phone=?,newsletter_opt_in=?,kra_pin=?,location=?,google_maps_location=? WHERE id=?").run(name,firstName,lastName,whats,whats,mpesa,newsletter,kra,location,googleMapsLocation,req.user.id);
   const changes=[]; if(before.name!==name)changes.push('name'); if((before.whatsapp_phone||before.phone||'')!==whats)changes.push('WhatsApp number'); if((before.mpesa_phone||before.phone||'')!==mpesa)changes.push('M-Pesa number'); if(Number(before.newsletter_opt_in||0)!==newsletter)changes.push('newsletter preference'); if((before.kra_pin||'')!==(kra||''))changes.push('billing/KRA details');
   if(changes.length)logActivity({userId:req.user.id,actorUserId:req.user.id,actorRole:'client',action:'account_edited',details:`Client updated ${changes.join(', ')}.`});
-  res.json({user:db.prepare("SELECT id,role,name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,last_login_at FROM users WHERE id=?").get(req.user.id)});
+  res.json({user:db.prepare("SELECT id,role,name,first_name,last_name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,location,google_maps_location,last_login_at FROM users WHERE id=?").get(req.user.id)});
 });
 app.post("/api/my/application-deposit/manual-payment",requireAuth,(req,res)=>{
  if(String(req.user.client_status||"current")==="current")return res.status(409).json({error:"This account is already approved."});
@@ -1895,7 +1925,9 @@ app.get("/api/trainer/summary",requireTrainer,(req,res)=>{
     classManualPaymentAttention:(()=>{try{return db.prepare(`SELECT e.id,e.booking_ref,c.title,c.price,e.credit_applied,e.hold_expires_at,e.manual_payment_code,e.manual_payment_amount,u.name client_name,p.name pet_name FROM class_enrolments e JOIN classes c ON c.id=e.class_id JOIN users u ON u.id=e.user_id LEFT JOIN pets p ON p.id=e.pet_id WHERE e.manual_payment_status='submitted' ORDER BY e.id`).all()}catch(err){console.error("Class manual-payment attention query failed:",err.message);return []}})(),
     applicationDepositAttention:db.prepare(`SELECT d.id,d.user_id,d.amount,d.manual_payment_code,d.submitted_at,u.name client_name FROM application_deposits d JOIN users u ON u.id=d.user_id WHERE d.manual_payment_status='submitted' ORDER BY d.submitted_at`).all(),
     notifications:db.prepare("SELECT n.*,u.name client_name,p.name pet_name FROM trainer_notifications n LEFT JOIN users u ON u.id=n.user_id LEFT JOIN pets p ON p.id=n.pet_id WHERE n.resolved=0 AND n.kind!='new_account' ORDER BY n.created_at DESC LIMIT 30").all(),
-    newBookingAttention:db.prepare(`SELECT n.id notification_id,n.booking_id,b.booking_ref,b.start_at,u.name client_name,p.name pet_name FROM trainer_notifications n JOIN bookings b ON b.id=n.booking_id LEFT JOIN users u ON u.id=n.user_id LEFT JOIN pets p ON p.id=n.pet_id WHERE n.resolved=0 AND n.kind='new_booking' ORDER BY b.start_at,n.created_at`).all(),
+    newBookingAttention:db.prepare(`SELECT n.id notification_id,n.user_id,n.booking_id,b.*,u.name client_name,COALESCE(u.whatsapp_phone,u.phone) client_phone,p.name pet_name FROM trainer_notifications n JOIN bookings b ON b.id=n.booking_id LEFT JOIN users u ON u.id=n.user_id LEFT JOIN pets p ON p.id=n.pet_id WHERE n.resolved=0 AND n.kind='new_booking' ORDER BY b.start_at,n.created_at`).all(),
+    newClassBookingAttention:db.prepare(`SELECT n.id notification_id,n.user_id,n.message,c.id class_id,c.title,u.name client_name,p.name pet_name,e.booking_ref,c.start_date FROM trainer_notifications n JOIN classes c ON c.id=n.class_id JOIN class_enrolments e ON e.class_id=c.id AND e.user_id=n.user_id LEFT JOIN users u ON u.id=n.user_id LEFT JOIN pets p ON p.id=e.pet_id WHERE n.resolved=0 AND n.kind='new_class_booking' ORDER BY c.start_date,n.created_at`).all(),
+    messagesAttention:db.prepare(`SELECT m.id,m.user_id,m.body,m.created_at,u.name client_name FROM client_messages m JOIN users u ON u.id=m.user_id WHERE m.sender_role='client' AND m.seen_by_trainer=0 ORDER BY m.created_at`).all(),
     blocks:db.prepare("SELECT * FROM availability_blocks ORDER BY start_at DESC LIMIT 20").all(),resources:db.prepare("SELECT * FROM resources ORDER BY created_at DESC").all(),clientCount:db.prepare("SELECT COUNT(*) n FROM users WHERE role='client'").get().n
   });
 });
@@ -2604,7 +2636,7 @@ app.get("/api/trainer/client/:id",requireTrainer,(req,res)=>{
   const user=db.prepare("SELECT id,name,first_name,last_name,email,phone,whatsapp_phone,mpesa_phone,newsletter_opt_in,kra_pin,location,google_maps_location,client_intro_note,household_dogs,household_adults,children_0_8,children_9_13,children_14_plus,household_changes,household_note,rejection_note,rejected_at,created_at,last_login_at,status_override,COALESCE(client_status,'current') client_status FROM users WHERE id=? AND role='client'").get(req.params.id);
   if(!user)return res.status(404).json({error:"Client not found."}); const rawClientStatus=String(user.client_status||'current'); user.activity_status=calculatedClientStatus(user); user.client_status=rawClientStatus==='applicant'?'unverified':rawClientStatus==='rejected'?'rejected':'current';
   const resources=db.prepare(`
-    SELECT DISTINCT r.id,r.title,r.type,r.category,
+    SELECT DISTINCT r.id,r.title,r.type,r.category,a.created_at shared_at,
       COALESCE((SELECT a2.note FROM resource_access a2 WHERE a2.resource_id=r.id AND a2.user_id=? ORDER BY a2.id DESC LIMIT 1),
                (SELECT a3.note FROM resource_access a3 WHERE a3.resource_id=r.id AND a3.class_id IN (SELECT class_id FROM class_enrolments WHERE user_id=? AND enrolment_status='active' AND payment_status IN ('paid','demo_paid','credit_paid')) ORDER BY a3.id DESC LIMIT 1)) note
     FROM resources r JOIN resource_access a ON a.resource_id=r.id
@@ -2612,8 +2644,13 @@ app.get("/api/trainer/client/:id",requireTrainer,(req,res)=>{
     ORDER BY COALESCE(r.category,'General'),r.type,r.title
   `).all(user.id,user.id,user.id,user.id);
   const applicationDeposit=db.prepare("SELECT * FROM application_deposits WHERE user_id=?").get(user.id)||null;
-  res.json({record_type:'client',user,pets:petDetailsForUser(user.id,true),applicationDeposit,bookings:db.prepare("SELECT * FROM bookings WHERE user_id=? ORDER BY start_at DESC").all(user.id),packages:db.prepare("SELECT * FROM booking_packages WHERE user_id=? ORDER BY created_at DESC").all(user.id),classes:db.prepare("SELECT e.*,c.title,c.start_date,c.end_date FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.user_id=?").all(user.id),resources,creditBalance:clientCreditBalance(user.id),creditHistory:db.prepare("SELECT * FROM client_credit_ledger WHERE user_id=? ORDER BY created_at DESC LIMIT 30").all(user.id),activity:db.prepare(`SELECT a.created_at,a.action,a.details,p.name pet_name,c.title class_title FROM activity_history a LEFT JOIN pets p ON p.id=a.pet_id LEFT JOIN classes c ON c.id=a.class_id WHERE a.user_id=? ORDER BY a.created_at DESC LIMIT 50`).all(user.id)});
+  const messages=[...db.prepare(`SELECT 'note' item_type,n.id,n.note body,n.created_at,'Amy' sender,p.name pet_name,b.service booking_service,b.start_at booking_start_at FROM training_notes n LEFT JOIN pets p ON p.id=n.pet_id LEFT JOIN bookings b ON b.id=n.booking_id WHERE n.user_id=? AND n.client_visible=1`).all(user.id),...db.prepare(`SELECT 'reply' item_type,id,body,created_at,'Client' sender,NULL pet_name,NULL booking_service,NULL booking_start_at FROM client_messages WHERE user_id=?`).all(user.id)].sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)));
+  const privateNotes=db.prepare("SELECT * FROM client_private_notes WHERE user_id=? ORDER BY created_at DESC,id DESC").all(user.id);
+  res.json({record_type:'client',user,pets:petDetailsForUser(user.id,true),applicationDeposit,bookings:db.prepare("SELECT * FROM bookings WHERE user_id=? ORDER BY start_at DESC").all(user.id),packages:db.prepare("SELECT * FROM booking_packages WHERE user_id=? ORDER BY created_at DESC").all(user.id),classes:db.prepare("SELECT e.*,c.title,c.start_date,c.end_date FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.user_id=?").all(user.id),resources,messages,privateNotes,creditBalance:clientCreditBalance(user.id),creditHistory:db.prepare("SELECT * FROM client_credit_ledger WHERE user_id=? ORDER BY created_at DESC LIMIT 30").all(user.id),activity:db.prepare(`SELECT a.created_at,a.action,a.details,p.name pet_name,c.title class_title FROM activity_history a LEFT JOIN pets p ON p.id=a.pet_id LEFT JOIN classes c ON c.id=a.class_id WHERE a.user_id=? ORDER BY a.created_at DESC LIMIT 50`).all(user.id)});
 });
+app.put("/api/trainer/clients/:id/profile",requireTrainer,(req,res)=>{const u=db.prepare("SELECT * FROM users WHERE id=? AND role='client'").get(req.params.id);if(!u)return res.status(404).json({error:'Client not found.'});const first=String(req.body.firstName??u.first_name??'').trim(),last=String(req.body.lastName??u.last_name??'').trim(),name=[first,last].filter(Boolean).join(' ')||u.name,location=String(req.body.location??u.location??'').trim(),maps=String(req.body.googleMapsLocation??u.google_maps_location??'').trim(),intro=String(req.body.clientIntroNote??u.client_intro_note??'').trim(),newsletter=req.body.newsletterOptIn===true||req.body.newsletterOptIn===1||String(req.body.newsletterOptIn)==='true'?1:0,kra=String(req.body.kraPin??u.kra_pin??'').trim()||null;const num=v=>String(v??'').trim()===''?null:Number(v);db.prepare("UPDATE users SET name=?,first_name=?,last_name=?,location=?,google_maps_location=?,client_intro_note=?,newsletter_opt_in=?,kra_pin=?,household_adults=?,household_dogs=?,children_0_8=?,children_9_13=?,children_14_plus=?,household_changes=?,household_note=? WHERE id=?").run(name,first,last,location,maps,intro,newsletter,kra,num(req.body.householdAdults),num(req.body.householdDogs),num(req.body.children0to8),num(req.body.children9to13),num(req.body.children14plus),String(req.body.householdChanges??u.household_changes??'').trim(),String(req.body.householdNote??u.household_note??'').trim(),u.id);res.json({ok:true});});
+app.post("/api/trainer/clients/:id/private-notes",requireTrainer,(req,res)=>{const note=String(req.body.note||'').trim();if(!note)return res.status(400).json({error:'Enter a private note.'});const u=db.prepare("SELECT id FROM users WHERE id=? AND role='client'").get(req.params.id);if(!u)return res.status(404).json({error:'Client not found.'});const id=db.prepare("INSERT INTO client_private_notes(user_id,note) VALUES(?,?)").run(u.id,note).lastInsertRowid;res.json({ok:true,id});});
+app.post("/api/trainer/messages/:id/seen",requireTrainer,(req,res)=>{db.prepare("UPDATE client_messages SET seen_by_trainer=1 WHERE id=?").run(req.params.id);db.prepare("UPDATE trainer_notifications SET resolved=1 WHERE kind='client_message' AND user_id=(SELECT user_id FROM client_messages WHERE id=?)").run(req.params.id);res.json({ok:true});});
 app.put("/api/trainer/pets/:id/private-notes",requireTrainer,(req,res)=>{
   const pet=db.prepare("SELECT id,user_id,name FROM pets WHERE id=?").get(req.params.id);
   if(!pet)return res.status(404).json({error:"Dog not found."});
@@ -2655,6 +2692,7 @@ app.post("/api/my/payments/apply-credit",requireAuth,(req,res)=>{
  tx();
  if(newRemaining===0&&target.type==='private')notifyTrainer({userId:req.user.id,petId:target.row.pet_id||null,bookingId:target.row.id,kind:'new_booking',message:`Confirmed booking ${target.row.booking_ref}.`});
  if(newRemaining===0&&target.type==='package'){const first=db.prepare("SELECT id,pet_id,booking_ref FROM bookings WHERE package_id=? ORDER BY start_at,id LIMIT 1").get(target.row.id);if(first)notifyTrainer({userId:req.user.id,petId:first.pet_id||null,bookingId:first.id,kind:'new_booking',message:`Confirmed training package ${target.row.name||target.row.id}.`});}
+ if(newRemaining===0&&target.type==='class')notifyTrainer({userId:req.user.id,petId:target.row.pet_id||null,classId:target.row.class_id,kind:'new_class_booking',message:`Confirmed class booking ${target.row.booking_ref}.`});
  const balance=clientCreditBalance(req.user.id);
  logActivity({userId:req.user.id,petId:target.row.pet_id||null,actorUserId:req.user.id,actorRole:"client",action:"client_credit_used",details:`KES ${applied} client credit applied to ${target.type} payment. Remaining credit KES ${balance}.`});
  res.json({ok:true,applied,remaining:newRemaining,creditBalance:balance,settled:newRemaining===0});
@@ -2682,7 +2720,7 @@ app.post("/api/my/bookings/:id/cancel-pending",requireAuth,(req,res)=>{const b=d
 app.post("/api/my/classes/:ref/manual-payment",requireAuth,(req,res)=>{
  const e=db.prepare(`SELECT e.*,c.price,c.title,p.name pet_name FROM class_enrolments e JOIN classes c ON c.id=e.class_id LEFT JOIN pets p ON p.id=e.pet_id WHERE e.booking_ref=? AND e.user_id=?`).get(req.params.ref,req.user.id);if(!e||e.enrolment_status!=="active"||e.payment_status!=="pending")return res.status(404).json({error:"Pending class payment not found."});if(expiryIsPast(e.hold_expires_at))return res.status(409).json({error:"The class hold has expired."});const code=normalizeMpesaReference(req.body.confirmationCode),amount=Number(req.body.amount),due=Math.max(0,Number(e.price||0)-Number(e.credit_applied||0));if(!/^[A-Z0-9]{10}$/.test(code))return res.status(400).json({error:"Enter the full 10-character M-Pesa confirmation reference."});if(!Number.isFinite(amount)||amount<=0||amount!==due)return res.status(400).json({error:`The manual payment should be KES ${due.toLocaleString()}.`});if(e.manual_payment_status==='submitted')return res.status(409).json({error:"This class payment confirmation has already been submitted to Amy."});db.prepare("UPDATE class_enrolments SET manual_payment_code=?,manual_payment_amount=?,manual_payment_status='submitted' WHERE id=?").run(code,amount,e.id);logClassEnrolmentEvent({...e,manual_payment_code:code},"manual_payment_submitted",{actorRole:"client",amount,reference:code,note:`Manual payment submitted for ${e.title}`});notifyTrainer({userId:req.user.id,petId:e.pet_id,classId:e.class_id,kind:'class_manual_payment',message:`Manual M-Pesa payment submitted for class ${e.title}: ${code}, KES ${amount}.`});res.json({ok:true,id:e.id,amount,mpesaRef:code})
 });
-app.post("/api/trainer/class-enrolments/:id/manual-payment",requireTrainer,(req,res)=>{const e=db.prepare(`SELECT e.*,c.title FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.id=?`).get(req.params.id);if(!e||e.manual_payment_status!=='submitted')return res.status(404).json({error:"Class manual payment submission not found."});const approve=!!req.body.approve;if(approve)db.prepare("UPDATE class_enrolments SET payment_status='paid',manual_payment_status='verified',hold_expires_at=NULL,payment_received_at=CURRENT_TIMESTAMP,mpesa_receipt_number=? WHERE id=?").run(e.manual_payment_code,e.id);else db.prepare("UPDATE class_enrolments SET manual_payment_status=NULL,manual_payment_code=NULL,manual_payment_amount=NULL WHERE id=?").run(e.id);db.prepare("UPDATE trainer_notifications SET resolved=1 WHERE kind='class_manual_payment' AND (class_id=? OR (class_id IS NULL AND user_id=?))").run(e.class_id,e.user_id);logClassEnrolmentEvent({...e,payment_status:approve?'paid':e.payment_status},approve?'manual_payment_verified':'manual_payment_rejected',{actorRole:'trainer',amount:e.manual_payment_amount,reference:e.manual_payment_code,note:e.title});res.json({ok:true})});
+app.post("/api/trainer/class-enrolments/:id/manual-payment",requireTrainer,(req,res)=>{const e=db.prepare(`SELECT e.*,c.title FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.id=?`).get(req.params.id);if(!e||e.manual_payment_status!=='submitted')return res.status(404).json({error:"Class manual payment submission not found."});const approve=!!req.body.approve;if(approve){db.prepare("UPDATE class_enrolments SET payment_status='paid',manual_payment_status='verified',hold_expires_at=NULL,payment_received_at=CURRENT_TIMESTAMP,mpesa_receipt_number=? WHERE id=?").run(e.manual_payment_code,e.id);notifyTrainer({userId:e.user_id,petId:e.pet_id,classId:e.class_id,kind:'new_class_booking',message:`Confirmed class booking ${e.booking_ref}.`});}else db.prepare("UPDATE class_enrolments SET manual_payment_status=NULL,manual_payment_code=NULL,manual_payment_amount=NULL WHERE id=?").run(e.id);db.prepare("UPDATE trainer_notifications SET resolved=1 WHERE kind='class_manual_payment' AND (class_id=? OR (class_id IS NULL AND user_id=?))").run(e.class_id,e.user_id);logClassEnrolmentEvent({...e,payment_status:approve?'paid':e.payment_status},approve?'manual_payment_verified':'manual_payment_rejected',{actorRole:'trainer',amount:e.manual_payment_amount,reference:e.manual_payment_code,note:e.title});res.json({ok:true})});
 
 app.post("/api/my/bookings/:id/manual-payment",requireAuth,(req,res)=>{
  const b=db.prepare("SELECT * FROM bookings WHERE id=? AND user_id=?").get(req.params.id,req.user.id);
@@ -2740,13 +2778,11 @@ app.get("/api/trainer/reports/:type",requireTrainer,(req,res)=>{
     const privateRows=db.prepare(`
       SELECT COALESCE(b.payment_received_at,b.created_at) received_at,
              u.name client,
-             CASE WHEN b.payment_status='credit_paid' THEN 0
-                  WHEN b.manual_payment_status='verified' AND b.manual_payment_amount IS NOT NULL THEN b.manual_payment_amount
-                  ELSE MAX(COALESCE(b.price,0)-COALESCE(b.credit_applied,0),0) END amount,
+             COALESCE(b.price,0) amount,
              COALESCE(b.mpesa_receipt_number,b.manual_payment_code,'') mpesa_ref,
              b.payment_status status,
              TRIM(
-               CASE WHEN COALESCE(b.refund_amount,0)>0 THEN 'KES '||b.refund_amount||' / '||COALESCE(NULLIF(b.refund_confirmation_code,''),'Cash') WHEN COALESCE(b.credit_amount,0)>0 THEN 'KES '||b.credit_amount||' / Credit' WHEN COALESCE(b.credit_applied,0)>0 THEN 'KES '||b.credit_applied||' / Credit' ELSE '' END
+               CASE WHEN COALESCE(b.refund_amount,0)>0 THEN 'KES '||b.refund_amount||' / '||COALESCE(NULLIF(b.refund_confirmation_code,''),'Cash') WHEN COALESCE(b.credit_amount,0)>0 THEN 'KES '||b.credit_amount||' / Credit' ELSE '' END
              ) refund_credit,
              'Private' source,p.name dog,b.booking_ref
       FROM bookings b JOIN users u ON u.id=b.user_id LEFT JOIN pets p ON p.id=b.pet_id
@@ -2755,12 +2791,10 @@ app.get("/api/trainer/reports/:type",requireTrainer,(req,res)=>{
     const packageRows=db.prepare(`
       SELECT COALESCE(bp.payment_received_at,bp.created_at) received_at,
              u.name client,
-             CASE WHEN bp.payment_status='credit_paid' THEN 0
-                  WHEN bp.manual_payment_status='verified' AND bp.manual_payment_amount IS NOT NULL THEN bp.manual_payment_amount
-                  ELSE MAX(COALESCE(bp.package_price,0)-COALESCE(bp.credit_applied,0),0) END amount,
+             COALESCE(bp.package_price,0) amount,
              COALESCE(bp.mpesa_receipt_number,bp.manual_payment_code,'') mpesa_ref,
              bp.payment_status status,
-             CASE WHEN COALESCE(bp.credit_applied,0)>0 THEN 'KES '||bp.credit_applied||' / Credit' ELSE '' END refund_credit,
+             '' refund_credit,
              'Package' source,p.name dog,('PACKAGE-'||bp.id) booking_ref
       FROM booking_packages bp JOIN users u ON u.id=bp.user_id LEFT JOIN pets p ON p.id=bp.pet_id
       WHERE bp.payment_status NOT IN ('pending','cancelled','failed')
@@ -2768,13 +2802,11 @@ app.get("/api/trainer/reports/:type",requireTrainer,(req,res)=>{
     const classRows=db.prepare(`
       SELECT COALESCE(e.payment_received_at,e.created_at) received_at,
              u.name client,
-             CASE WHEN e.payment_status='credit_paid' THEN 0
-                  WHEN e.manual_payment_status='verified' AND e.manual_payment_amount IS NOT NULL THEN e.manual_payment_amount
-                  ELSE MAX(COALESCE(c.price,0)-COALESCE(e.credit_applied,0),0) END amount,
+             COALESCE(c.price,0) amount,
              COALESCE(e.mpesa_receipt_number,e.manual_payment_code,'') mpesa_ref,
              e.payment_status status,
              TRIM(
-               CASE WHEN COALESCE(e.refund_amount,0)>0 THEN 'KES '||e.refund_amount||' / '||COALESCE(NULLIF(e.refund_confirmation_code,''),'Cash') WHEN COALESCE(e.credit_amount,0)>0 THEN 'KES '||e.credit_amount||' / Credit' WHEN COALESCE(e.credit_applied,0)>0 THEN 'KES '||e.credit_applied||' / Credit' ELSE '' END
+               CASE WHEN COALESCE(e.refund_amount,0)>0 THEN 'KES '||e.refund_amount||' / '||COALESCE(NULLIF(e.refund_confirmation_code,''),'Cash') WHEN COALESCE(e.credit_amount,0)>0 THEN 'KES '||e.credit_amount||' / Credit' ELSE '' END
              ) refund_credit,
              'Class' source,p.name dog,e.booking_ref
       FROM class_enrolments e JOIN users u ON u.id=e.user_id LEFT JOIN pets p ON p.id=e.pet_id JOIN classes c ON c.id=e.class_id
