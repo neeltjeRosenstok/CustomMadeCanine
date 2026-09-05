@@ -437,6 +437,8 @@ function validWhatsappPhone(value){
  const raw=String(value||"").trim();
  if(!/^\+?[0-9 ]+$/.test(raw))return false;
  const digits=raw.replace(/\D/g,"");
+ const compact=raw.replace(/\s+/g,"");
+ if(/^(?:\+254|0[17])/.test(compact))return !!normalizeKenyanMpesaPhone(raw);
  return digits.length>=6&&digits.length<=18;
 }
 function normalizeKenyanMpesaPhone(value){
@@ -2475,7 +2477,7 @@ app.post("/api/trainer/clients/:userId/provisional-booking",requireTrainer,async
   const standardPrice={consultation:5000,standard:4000,extra:6000}[service],totalPrice=Number(packagePrice)>0?Number(packagePrice):standardPrice*n,hold=addHoursIso(24);
   let packageId=null;if(n>1){packageId=db.prepare("INSERT INTO booking_packages(user_id,pet_id,name,service,location_type,address,package_price,payment_status,status,hold_expires_at) VALUES(?,?,?,?,?,?,?,'pending','provisional',?)").run(user.id,pet.id,String(packageName||`${pet.name} – ${n} Session Training Package`).trim(),service,locationType,address||null,totalPrice,hold).lastInsertRowid}
   const ids=[];for(const p of proposed){const refCode=ref('PRV');const id=db.prepare("INSERT INTO bookings(user_id,pet_id,booking_ref,service,location_type,address,start_at,end_at,buffer_end_at,travel_minutes,price,payment_status,status,notes,hold_expires_at,package_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(user.id,pet.id,refCode,service,locationType,address||null,p.st,p.en,p.be,travel,packageId?0:totalPrice,'pending','provisional',packageId?'Part of provisional package created by Amy.':'Created by Amy; client confirmation and payment required.',hold,packageId).lastInsertRowid;ids.push(id);db.prepare("INSERT INTO booking_history(booking_id,actor_role,action,details) VALUES(?,?,?,?)").run(id,'trainer','provisional_created',`Held until ${hold}`)}
-  logActivity({userId:user.id,petId:pet.id,actorUserId:req.user.id,actorRole:'trainer',action:packageId?'package_proposed':'provisional_booking_created',details:packageId?`${n}-session private package proposed at KES ${totalPrice}.`:`Provisional booking created; held 24 hours.`});
+  logActivity({userId:user.id,petId:pet.id,actorUserId:req.user.id,actorRole:'trainer',action:packageId?'package_proposed':'provisional_booking_created',details:packageId?`${n}-session private package proposed at KES ${totalPrice}.`:`Provisional booking created — held until ${hold}.`});
   res.json({ok:true,ids,packageId,holdExpiresAt:hold,amount:totalPrice,overrideUsed:!!overrideLocation});
 });
 app.post("/api/my/bookings/:id/accept-provisional",requireAuth,async(req,res)=>{
@@ -2698,7 +2700,7 @@ app.post("/api/my/payments/apply-credit",requireAuth,(req,res)=>{
  if(newRemaining===0&&target.type==='package'){const first=db.prepare("SELECT id,pet_id,booking_ref FROM bookings WHERE package_id=? ORDER BY start_at,id LIMIT 1").get(target.row.id);if(first)notifyTrainer({userId:req.user.id,petId:first.pet_id||null,bookingId:first.id,kind:'new_booking',message:`Confirmed training package ${target.row.name||target.row.id}.`});}
  if(newRemaining===0&&target.type==='class')notifyTrainer({userId:req.user.id,petId:target.row.pet_id||null,classId:target.row.class_id,kind:'new_class_booking',message:`Confirmed class booking ${target.row.booking_ref}.`});
  const balance=clientCreditBalance(req.user.id);
- logActivity({userId:req.user.id,petId:target.row.pet_id||null,actorUserId:req.user.id,actorRole:"client",action:"client_credit_used",details:`KES ${applied} client credit applied to ${target.type} payment. Remaining credit KES ${balance}.`});
+ logActivity({userId:req.user.id,petId:target.row.pet_id||null,actorUserId:req.user.id,actorRole:"client",action:"client_credit_used",details:`KES ${applied} client credit applied to ${target.type==='class'?'class booking':target.type==='private'?'private training':target.type==='package'?'private training package':'resource purchase'}. Remaining credit KES ${balance}.`});
  res.json({ok:true,applied,remaining:newRemaining,creditBalance:balance,settled:newRemaining===0});
 });
 
@@ -2772,6 +2774,23 @@ app.post("/api/trainer/reschedule-requests/:id/decision",requireTrainer,(req,res
 app.post("/api/trainer/notifications/:id/resolve",requireTrainer,(req,res)=>{db.prepare("UPDATE trainer_notifications SET resolved=1 WHERE id=?").run(req.params.id);res.json({ok:true})});
 
 app.post("/api/bookings/package/:id/demo-pay",requireAuth,(req,res)=>{const p=db.prepare("SELECT * FROM booking_packages WHERE id=? AND user_id=? AND payment_status='pending'").get(req.params.id,req.user.id);if(!p)return res.status(404).json({error:"Package not found."});db.prepare("UPDATE booking_packages SET payment_status='demo_paid',status='confirmed',hold_expires_at=NULL,payment_received_at=CURRENT_TIMESTAMP WHERE id=?").run(p.id);db.prepare("UPDATE bookings SET payment_status='demo_paid',status='confirmed',hold_expires_at=NULL WHERE package_id=?").run(p.id);res.json({ok:true})});
+
+app.get("/api/trainer/single-client-report/:id",requireTrainer,(req,res)=>{
+ const id=Number(req.params.id),from=String(req.query.from||nairobiDateKey(-30)),to=String(req.query.to||nairobiDateKey(0));
+ const user=db.prepare("SELECT id,name,first_name,last_name,email,phone,whatsapp_phone,mpesa_phone,location,google_maps_location,client_intro_note,newsletter_opt_in,kra_pin,household_dogs,household_adults,children_0_8,children_9_13,children_14_plus,household_changes,household_note FROM users WHERE id=? AND role='client'").get(id);
+ if(!user)return res.status(404).json({error:'Client not found.'});
+ const pets=db.prepare("SELECT id,name,breed,gender,date_of_birth,neutered_spayed,behavior_notes,medical_procedures,vaccination_status FROM pets WHERE user_id=? AND COALESCE(archived,0)=0 ORDER BY id").all(id);
+ const history=db.prepare(`SELECT a.created_at,a.action,a.details,p.name pet_name FROM activity_history a LEFT JOIN pets p ON p.id=a.pet_id WHERE a.user_id=? AND substr(a.created_at,1,10) BETWEEN ? AND ? ORDER BY a.created_at ASC,a.id ASC`).all(id,from,to);
+ const trainingNotes=db.prepare(`SELECT n.created_at,n.note,p.name pet_name FROM training_notes n LEFT JOIN pets p ON p.id=n.pet_id WHERE n.user_id=? AND substr(n.created_at,1,10) BETWEEN ? AND ? ORDER BY n.created_at ASC,n.id ASC`).all(id,from,to);
+ const resources=db.prepare(`SELECT DISTINCT r.title,a.created_at shared_at FROM resource_access a JOIN resources r ON r.id=a.resource_id WHERE (a.user_id=? OR a.class_id IN (SELECT class_id FROM class_enrolments WHERE user_id=? AND enrolment_status='active')) AND substr(COALESCE(a.created_at,''),1,10) BETWEEN ? AND ? ORDER BY a.created_at ASC,a.id ASC`).all(id,id,from,to);
+ const payments=[];
+ db.prepare(`SELECT COALESCE(payment_received_at,created_at) date,COALESCE(manual_payment_code,mpesa_receipt_number,'') reference,COALESCE(price,0) amount,CASE WHEN manual_payment_status='submitted' THEN 'Unverified' WHEN payment_status='credit_paid' THEN 'Credit used' WHEN COALESCE(credit_applied,0)>0 THEN 'Paid · Credit used KES '||credit_applied ELSE payment_status END status FROM bookings WHERE user_id=? AND package_id IS NULL AND (payment_status NOT IN ('pending','cancelled','failed') OR manual_payment_status='submitted') AND substr(COALESCE(payment_received_at,created_at),1,10) BETWEEN ? AND ?`).all(id,from,to).forEach(x=>payments.push(x));
+ db.prepare(`SELECT COALESCE(payment_received_at,created_at) date,COALESCE(manual_payment_code,mpesa_receipt_number,'') reference,COALESCE(package_price,0) amount,CASE WHEN manual_payment_status='submitted' THEN 'Unverified' WHEN payment_status='credit_paid' THEN 'Credit used' WHEN COALESCE(credit_applied,0)>0 THEN 'Paid · Credit used KES '||credit_applied ELSE payment_status END status FROM booking_packages WHERE user_id=? AND (payment_status NOT IN ('pending','cancelled','failed') OR manual_payment_status='submitted') AND substr(COALESCE(payment_received_at,created_at),1,10) BETWEEN ? AND ?`).all(id,from,to).forEach(x=>payments.push(x));
+ db.prepare(`SELECT COALESCE(e.payment_received_at,e.created_at) date,COALESCE(e.manual_payment_code,e.mpesa_receipt_number,'') reference,COALESCE(c.price,0) amount,CASE WHEN e.manual_payment_status='submitted' THEN 'Unverified' WHEN e.payment_status='credit_paid' THEN 'Credit used' WHEN COALESCE(e.credit_applied,0)>0 THEN 'Paid · Credit used KES '||e.credit_applied ELSE e.payment_status END status FROM class_enrolments e JOIN classes c ON c.id=e.class_id WHERE e.user_id=? AND (e.payment_status NOT IN ('pending','cancelled','failed') OR e.manual_payment_status='submitted') AND substr(COALESCE(e.payment_received_at,e.created_at),1,10) BETWEEN ? AND ?`).all(id,from,to).forEach(x=>payments.push(x));
+ db.prepare(`SELECT COALESCE(submitted_at,verified_at,created_at) date,COALESCE(manual_payment_code,'') reference,amount,CASE WHEN manual_payment_status='submitted' THEN 'Unverified' WHEN manual_payment_status='verified' THEN 'Verified' ELSE manual_payment_status END status FROM application_deposits WHERE user_id=? AND substr(COALESCE(submitted_at,verified_at,created_at),1,10) BETWEEN ? AND ?`).all(id,from,to).forEach(x=>payments.push(x));
+ payments.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+ res.json({title:'Single Client Report',from,to,user,pets,history,trainingNotes,payments,resources,creditBalance:clientCreditBalance(id)});
+});
 
 app.get("/api/trainer/reports/:type",requireTrainer,(req,res)=>{
   expireTimedHolds(); const type=String(req.params.type||''),from=String(req.query.from||nairobiDateKey(-30)),to=String(req.query.to||nairobiDateKey(30)); let rows=[],title='Report';
